@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Handlers\FilesEmailsDuplicates;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use App\Helpers\CsvHandler;
+use App\Helpers\Csv;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Contracts\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -18,7 +18,7 @@ class CheckCsvController extends Controller
 
     public function index(): View
     {
-        new CsvHandler( storage_path('app/public') . '/testfile.csv');
+        new Csv( storage_path('app/public') . '/testfile.csv');
         return view('checkCsv');
     }
 
@@ -54,7 +54,7 @@ class CheckCsvController extends Controller
             $source_file_path = storage_path('app/public').'/'.$file_name;
 
             $stream = fopen( $source_file_path, 'r' );
-            $tmp_arr[$manager] = CsvHandler::arrFromMailsCsv( $stream );
+            $tmp_arr[$manager] = Csv::arrFromMailsCsv( $stream );
         }
 
         $managers = array_keys($tmp_arr);

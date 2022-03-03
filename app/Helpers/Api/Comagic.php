@@ -11,22 +11,22 @@ use GuzzleHttp\Exception\GuzzleException;
 class Comagic
 {
 
-    public string $api_breakpoint;
+    private string $api_key;
     public LoggerInterface $errorLogger;
+    private string $api_endpoint = 'https://dataapi.comagic.ru/v2.0';
 
     public function __construct()
     {
-        $this->api_breakpoint = 'https://dataapi.comagic.ru/v2.0';
+        $this->api_key = config('services.comagic.key');
         $this->errorLogger = Log::build(['driver' => 'single', 'path' => storage_path('logs/api/comagic/error.log')]);
     }
 
     /**
      * @throws GuzzleException
      */
-    public function callInfo(string $date_from, string $date_till)
+    public function visitorsCalls(string $date_from, string $date_till)
     {
-        $api_key = config('services.comagic.key');
-
+        dd($this->api_key);
         $client = new Client([
             'headers' => [
                 'charset' => "UTF-8",
@@ -36,16 +36,31 @@ class Comagic
         $response = null;
 
         try {
-            $response = $client->post( $this->api_breakpoint, [
+            $response = $client->post( $this->api_endpoint, [
                 RequestOptions::JSON => [
                     'id' => uniqid(),
                     "method" => "get.calls_report",
                     "jsonrpc" => "2.0",
                     'params' => [
-                        'access_token' => $api_key,
+                        'access_token' => $this->api_key,
                         'date_from' => $date_from . ' 00:00:00',
                         'date_till' => $date_till . ' 23:59:59',
-                        "fields" => ['visitor_id', 'contact_phone_number']
+                        "fields" => [
+                            'visitor_id',
+                            'contact_phone_number',
+                            'utm_source',
+                            'utm_medium',
+                            'utm_term',
+                            'utm_content',
+                            'utm_campaign',
+                            'eq_utm_source',
+                            'eq_utm_medium',
+                            'eq_utm_term',
+                            'eq_utm_content',
+                            'eq_utm_campaign',
+                            'eq_utm_referrer',
+                            'eq_utm_expid',
+                        ]
                     ],
                 ]
             ]);
@@ -60,7 +75,7 @@ class Comagic
             $this->errorLogger->error( print_r($response, true) );
         }
 
-        return  $response;
+        return $response;
     }
 
 }

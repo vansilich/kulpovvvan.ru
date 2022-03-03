@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Helpers\CsvHandler;
+use App\Helpers\Csv;
 use Carbon\Carbon;
 use Exception;
 use App\Helpers\Api\Gmail;
@@ -27,8 +27,6 @@ class ParseGmailsChunksJob implements ShouldQueue
 
     /**
      * Create a new job instance.
-     *
-     * @return void
      */
     public function __construct(
         private array $email_regexps,
@@ -37,8 +35,6 @@ class ParseGmailsChunksJob implements ShouldQueue
 
     /**
      * Execute the job.
-     *
-     * @return void
      * @throws Exception
      */
     public function handle()
@@ -77,7 +73,7 @@ class ParseGmailsChunksJob implements ShouldQueue
                     if ( empty($phones[0]) ) continue;
                     foreach ($phones[0] as $phone) {
 
-                        if ( !in_array($phone, $this->parsed_data[ $email ]) ){
+                        if ( !isset($this->parsed_data[ $email ]) || !in_array($phone, $this->parsed_data[ $email ]) ){
                             $this->parsed_data[ $email ][] = $phone;
                         }
                     }
@@ -99,7 +95,7 @@ class ParseGmailsChunksJob implements ShouldQueue
 
         //конец парсинга
         $name = $this->manager . '_' . Carbon::now()->timestamp . '.csv';
-        $csv = new CsvHandler(storage_path('app/public').'/'.$name );
+        $csv = new Csv(storage_path('app/public').'/'.$name );
         $csv->openStream();
 
         foreach ($this->parsed_data as $manager => $phones) {
@@ -111,7 +107,7 @@ class ParseGmailsChunksJob implements ShouldQueue
         $csv->closeStream();
 
         //Удаляем кеш файл
-        Storage::disk('local')->delete('public/parse-gmail/' . $this->manager);
+//        Storage::disk('local')->delete('public/parse-gmail/' . $this->manager);
     }
 
     /**

@@ -2,7 +2,7 @@
 
 namespace App\Helpers;
 
-class CsvHandler extends File
+class Csv extends File
 {
     public static string $separator = ';';
     public static string $enclosure = '"';
@@ -35,9 +35,9 @@ class CsvHandler extends File
         return $tmp_array;
     }
 
-    public function insertRow( array $headers )
+    public function insertRow( array $row )
     {
-        fputcsv($this->stream, $headers, self::$separator, self::$enclosure);
+        fputcsv($this->stream, $row, self::$separator, self::$enclosure);
     }
 
 }

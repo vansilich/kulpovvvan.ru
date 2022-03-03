@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\Api\YMetrica;
-use App\Helpers\CsvHandler;
+use App\Helpers\Csv;
 use App\Models\ObservableUrl;
 use App\Models\UrlViewsReport;
 use Carbon\Carbon;
+use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Cache;
@@ -30,7 +31,10 @@ class MetricaController extends Controller
         return view('metrika.printPagesReport')->with('from', $from)->with('to', $to);
     }
 
-    public function pagesReportFormHandle( FromToDateRequest $request ): void
+    /**
+     * @throws GuzzleException
+     */
+    public function pagesReportFormHandle(FromToDateRequest $request ): void
     {
         YMetrica::pageReport( $request->get('dateStart'), $request->get('dateEnd') );
     }
@@ -41,8 +45,10 @@ class MetricaController extends Controller
         $dateTo = $request->get('dateEnd');
 
         $file_name = Carbon::now()->timestamp.'.csv';
-        $file_path = storage_path('app/public').'/'.$file_name;
-        $stream = fopen( $file_path, 'w+');
+        $csv = new Csv( storage_path('app/public').'/'.$file_name );
+
+        $csv->openStream();
+
         $headers = [ 'url' ];
         $is_headers_set = false;
 
@@ -84,19 +90,16 @@ class MetricaController extends Controller
                     $headers[] = $start_date . '---' . $end_date;
                 }
 
-                fputcsv($stream, $headers, CsvHandler::$separator, CsvHandler::$enclosure);
+                $csv->insertRow( $headers );
             }
 
-            fputcsv($stream, $row, CsvHandler::$separator, CsvHandler::$enclosure);
+            $csv->insertRow( $row );
         }
 
-        fclose($stream);
+        $csv->closeStream();
+        $csv->deleteAfterResp();
 
-        App::terminating( function () use ($file_name) {
-            Storage::disk('local')->delete('public/'.$file_name);
-        });
-
-        return response()->download($file_path);
+        return response()->download( $csv->filePath );
     }
 
 }

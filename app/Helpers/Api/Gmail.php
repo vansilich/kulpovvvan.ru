@@ -17,8 +17,8 @@ use Google\Service\Gmail\ListMessagesResponse;
 class Gmail
 {
 
-    private LoggerInterface $logger;
     public Google_Client $client;
+    private LoggerInterface $logger;
     public Google_Service_Gmail $service;
 
     /**
@@ -67,10 +67,6 @@ class Gmail
 
             $text = $this->getEmailText($payload);
 
-            if ( !$text ) {
-                $this->logger->error("getEmailText: Сообщение с id $message_id оказалось без текста");
-            }
-
             yield [
                 'from' => $from,
                 'to' => $to,
@@ -101,7 +97,7 @@ class Gmail
     }
 
     /**
-     * Retrieve text from 'text/plain' part from message
+     * Retrieve 'text/plain' part from message
      *
      * @param MessagePart $messagePart
      * @return string|bool

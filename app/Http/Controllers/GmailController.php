@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\ParseManagersGmailsJob;
 use Illuminate\Http\Request;
-use Illuminate\Contracts\View\View;
 use Illuminate\Support\MessageBag;
+use Illuminate\Contracts\View\View;
+use App\Jobs\ParseManagersGmailsJob;
 
 class GmailController extends Controller
 {

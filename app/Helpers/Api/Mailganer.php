@@ -2,9 +2,11 @@
 
 namespace App\Helpers\Api;
 
+use Exception;
 use GuzzleHttp\Client;
 use GuzzleHttp\RequestOptions;
 use GuzzleHttp\Exception\GuzzleException;
+use Throwable;
 
 class Mailganer
 {
@@ -63,7 +65,7 @@ class Mailganer
     }
 
     /**
-     * @throws GuzzleException
+     * @throws Throwable
      */
     public static function subscriberInfo( array $data )
     {

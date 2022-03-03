@@ -12,6 +12,9 @@ use Illuminate\Database\Eloquent\Collection;
 class YMetrica
 {
 
+    private static string $api_endpoint = 'https://api-metrika.yandex.net/stat/v1/data/bytime?';
+    private static int $counter_id = 5484148;
+
     /**
      * Request to get the number of visits to certain pages on arbitrary dates.
      * $viewsReports grouped by week.
@@ -54,9 +57,7 @@ class YMetrica
                         'url_id' => $currentReportInterval['url_id'],
                         'day' => $currentReportInterval['day'],
                         ],
-                        [
-                            'views' => $currentReportInterval['views']
-                        ]
+                        [ 'views' => $currentReportInterval['views'] ]
                     );
                 }
             }
@@ -68,7 +69,7 @@ class YMetrica
     public static function pageReportUrl( $dateFrom, $dateTo, $url ): string
     {
         $query = [
-            'ids' => '5484148',
+            'ids' => self::$counter_id,
             'metrics' => 'ym:s:pageviews',
             'group' => 'day',
             'date1' => $dateFrom,
@@ -76,7 +77,7 @@ class YMetrica
             'filters' => "ym:pv:URL=='". trim( $url ) ."'",
         ];
 
-        return 'https://api-metrika.yandex.net/stat/v1/data/bytime?'. urldecode( http_build_query($query) );
+        return self::$api_endpoint . urldecode( http_build_query($query) );
     }
 
     /**

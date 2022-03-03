@@ -3,13 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\Api\BigQuery;
-use App\Helpers\CsvHandler;
+use App\Helpers\Csv;
 use App\Helpers\TxtHandler;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\MessageBag;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -52,23 +50,20 @@ class BigQueryController extends Controller
         }
 
         $name = Carbon::now()->timestamp . '.csv';
-        $path = storage_path('app/public').'/'.$name;
-        $stream = fopen( $path, 'w+');
+        $csv = new Csv(storage_path('app/public').'/'.$name);
+        $csv->openStream();
 
         //headers
-        fputcsv($stream, array('YM_UIDS'),  CsvHandler::$separator, CsvHandler::$enclosure);
+        $csv->insertRow( ['YM_UIDS'] );
 
         //data
         foreach ($YM_UIDS as $client_name => $value) {
-            fputcsv($stream, array($value),  CsvHandler::$separator, CsvHandler::$enclosure);
+            $csv->insertRow( [$value] );
         }
 
-        fclose($stream);
+        $csv->closeStream();
+        $csv->deleteAfterResp();
 
-        App::terminating( function () use ($name) {
-            Storage::disk('local')->delete('public/'.$name);
-        });
-
-        return response()->download($path);
+        return response()->download( $csv->filePath );
     }
 }

@@ -2,7 +2,7 @@
 
 namespace App\Handlers;
 
-use App\Helpers\CsvHandler;
+use App\Helpers\Csv;
 use Carbon\Carbon;
 
 class FilesEmailsDuplicates
@@ -60,7 +60,7 @@ class FilesEmailsDuplicates
     public static function saveToFile( array $managers, array $tmp_arr ): string
     {
         $name = Carbon::now()->timestamp . '.csv';
-        $resultCsv = new CsvHandler(storage_path('app/public').'/'.$name);
+        $resultCsv = new Csv(storage_path('app/public').'/'.$name);
 
         $resultCsv->openStream();
 

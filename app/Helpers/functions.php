@@ -4,7 +4,14 @@ use Carbon\Carbon;
 
 if ( !function_exists('sortArrByTime')) {
 
-    function sortArrByTime($a, $b): int
+    /**
+     * Сортирует массивы по неделям
+     *
+     * @param $a array
+     * @param $b array
+     * @return int
+     */
+    function sortArrByTime( array $a, array $b ): int
     {
 
         if ($a["day"] == $b["day"]) {
@@ -18,7 +25,7 @@ if ( !function_exists('sortArrByTime')) {
 if ( !function_exists('splitByWeeks') ) {
 
     /**
-     * Return array split by weeks
+     * Распределяет даты в масссиве по неделям
      *
      * @param array $data
      * @return array
@@ -39,7 +46,7 @@ if ( !function_exists('splitByWeeks') ) {
 if ( !function_exists('is_valid_email') ) {
 
     /**
-     * Check if email valid
+     * Проверка валидности Email
      *
      * @param string $email
      * @return bool
@@ -55,7 +62,7 @@ if ( !function_exists('is_valid_email') ) {
 if ( !function_exists('decodeGmailBody') ) {
 
     /**
-     * Decode string from Base64
+     * Декодирует строку, переданную как текст письма Gmail
      *
      * @param $rawData
      * @return bool|string
@@ -70,5 +77,33 @@ if ( !function_exists('decodeGmailBody') ) {
         }
 
         return $decodedMessage;
+    }
+}
+
+if ( !function_exists('limitedFuncRetry') ) {
+
+    /**
+     * Функция для обработки API запросов, периодически отказывающих из-за throttling.
+     *
+     * @param int $depth - количество попыток вызова
+     * @param int $shift - задержка в секундах перед вызовами
+     * @param callable $fn - функция, которая будет вызываться
+     * @return mixed
+     *
+     * @throws Exception
+     */
+    function limitedFuncRetry( int $depth, int $shift, callable $fn ): mixed
+    {
+        for ($i = $depth; $depth >= 0; $i--) {
+
+            try {
+                return $fn();
+            } catch ( Exception $exception ) {
+                sleep( $shift );
+                continue;
+            }
+        }
+
+        throw new Exception('Функция не смогла вернуть результат без ошибки');
     }
 }

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Helpers\Api\Analytics;
-use App\Helpers\CsvHandler;
+use App\Helpers\Csv;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
@@ -34,11 +34,11 @@ class AnalyticsController extends Controller
 
         $headers = array('AdId', 'campaign', 'AdGroupName', 'AdGroupId', 'Date', 'Conversions_11', 'CostPerConversion_11', 'Conversions_8', 'CostPerConversion_8', 'Ctr', 'Clicks', 'Impressions');
 
-        $timestamp = Carbon::now()->timestamp;
-        $file_name = $timestamp.'.csv';
-        $file_path = storage_path('app/public').'/'.$file_name;
-        $stream = fopen( $file_path, 'w+');
-        fputcsv($stream, $headers, CsvHandler::$separator, CsvHandler::$enclosure);
+        $file_name = Carbon::now()->timestamp.'.csv';
+        $csv = new Csv( storage_path('app/public').'/'.$file_name );
+        $csv->openStream();
+
+        $csv->insertRow([$headers]);
 
         foreach ($this->request as $metric) {
 
@@ -54,18 +54,15 @@ class AnalyticsController extends Controller
                 if ($data[0] != '(not set)') {
                     $data[4] = Carbon::createFromFormat('Ymd', $data[4])->format('Y.m.d');
 
-                    fputcsv($stream, $data, CsvHandler::$separator, CsvHandler::$enclosure);
+                    $csv->insertRow( $data );
                 }
             }
         }
 
-        fclose($stream);
+        $csv->closeStream();
+        $csv->deleteAfterResp();
 
-        App::terminating( function () use ( $file_name ) {
-            Storage::disk('local')->delete('public/'.$file_name);
-        });
-
-        return response()->download($file_path);
+        return response()->download( $csv->filePath );
     }
 
 }

@@ -2,7 +2,7 @@
 
 @section('content')
 
-    <h1>Отчет по звонкам от Comagic</h1>
+    <h1>Ежемесячный SEO отчет</h1>
 
     <form action="{{ route('comagicCallsReportHandler') }}" method="POST" class="w-50">
         @csrf
@@ -10,7 +10,7 @@
 
         <div class="text-light bg-secondary p-3 rounded">
             <h3>Документация</h3>
-            <p>Отчет в выбраном промежутке дат. Выводит таблицу из 2 колонок (visitor_id и контактный номер телефона)</p>
+            <p>Покащывает</p>
         </div>
 
         @if ($errors->any())

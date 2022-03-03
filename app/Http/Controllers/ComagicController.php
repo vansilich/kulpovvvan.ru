@@ -21,7 +21,7 @@ class ComagicController extends Controller
      */
     public function handleCallsReport( FromToDateRequest $request ): View
     {
-        $response = (new Comagic())->callInfo( $request->get('dateStart'), $request->get('dateEnd') );
+        $response = (new Comagic())->visitorsCalls( $request->get('dateStart'), $request->get('dateEnd') );
 
         if ( isset( $response->error ) ) {
 
