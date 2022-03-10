@@ -38,14 +38,14 @@ class AuthGmailAccount extends Command
         $clientName = $this->argument('name');
 
         $client = (new Gmail())->setupAuth();
-        $tokenPath = base_path() . "/credentials/google/gmail/managers/${clientName}.json";
+        $tokenPath = base_path() . "/credentials/google/gmail/managers/$clientName.json";
 
         if ( file_exists($tokenPath) ) {
             $accessToken = json_decode(file_get_contents($tokenPath), true);
             $client->setAccessToken($accessToken);
         }
 
-        // If there is no previous token or it's expired.
+        // If there is no previous token, or it's expired.
         if ($client->isAccessTokenExpired()) {
             // Refresh the token if possible
             if ($client->getRefreshToken()) {

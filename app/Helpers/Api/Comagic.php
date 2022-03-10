@@ -2,6 +2,7 @@
 
 namespace App\Helpers\Api;
 
+use \stdClass;
 use GuzzleHttp\Client;
 use Psr\Log\LoggerInterface;
 use GuzzleHttp\RequestOptions;
@@ -22,50 +23,43 @@ class Comagic
     }
 
     /**
-     * @throws GuzzleException
+     * Запрос параметрезированного отчета у API
+     *
+     * @param string $api_method - Название метода для вызова у API
+     * @param string $date_from - дата начала отчета
+     * @param string $date_till - дата конца отчета
+     * @param array $fields - массив полей, которые должны быть в отчете
      */
-    public function visitorsCalls(string $date_from, string $date_till)
+    public function getReport( string $api_method, string $date_from, string $date_till, array $fields, $filter = [] ): stdClass
     {
-        dd($this->api_key);
         $client = new Client([
             'headers' => [
-                'charset' => "UTF-8",
+                'Charset' => "UTF-8",
             ]
         ]);
 
         $response = null;
+        $query = [
+            'id' => uniqid(),
+            "method" => $api_method,
+            "jsonrpc" => "2.0",
+            'params' => [
+                'limit' => 10000,
+                'access_token' => $this->api_key,
+                'date_from' => $date_from . ' 00:00:00',
+                'date_till' => $date_till . ' 23:59:59',
+                "fields" => $fields
+            ],
+        ];
+
+        if ( !empty($filter) ) {
+            $query['params']['filter'] = $filter;
+        }
 
         try {
-            $response = $client->post( $this->api_endpoint, [
-                RequestOptions::JSON => [
-                    'id' => uniqid(),
-                    "method" => "get.calls_report",
-                    "jsonrpc" => "2.0",
-                    'params' => [
-                        'access_token' => $this->api_key,
-                        'date_from' => $date_from . ' 00:00:00',
-                        'date_till' => $date_till . ' 23:59:59',
-                        "fields" => [
-                            'visitor_id',
-                            'contact_phone_number',
-                            'utm_source',
-                            'utm_medium',
-                            'utm_term',
-                            'utm_content',
-                            'utm_campaign',
-                            'eq_utm_source',
-                            'eq_utm_medium',
-                            'eq_utm_term',
-                            'eq_utm_content',
-                            'eq_utm_campaign',
-                            'eq_utm_referrer',
-                            'eq_utm_expid',
-                        ]
-                    ],
-                ]
-            ]);
-        } catch (GuzzleException $err) {
+            $response = $client->post( $this->api_endpoint, [RequestOptions::JSON => $query] );
 
+        } catch (GuzzleException $err) {
             $this->errorLogger->error( $err->getMessage() );
         }
 

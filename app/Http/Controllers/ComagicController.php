@@ -16,12 +16,13 @@ class ComagicController extends Controller
         return view('comagic/callsReportForm');
     }
 
-    /**
-     * @throws GuzzleException
-     */
     public function handleCallsReport( FromToDateRequest $request ): View
     {
-        $response = (new Comagic())->visitorsCalls( $request->get('dateStart'), $request->get('dateEnd') );
+        $fields = [
+            'visitor_id',
+            'contact_phone_number',
+        ];
+        $response = (new Comagic())->getReport( 'get.calls_report', $request->get('dateStart'), $request->get('dateEnd'), $fields );
 
         if ( isset( $response->error ) ) {
 
@@ -31,6 +32,6 @@ class ComagicController extends Controller
 
         return view('comagic/resultTable')
             ->with('data', $response->result->data)
-            ->with('columns', ['visitor_id', 'contact_phone_number']);
+            ->with('columns', $fields);
     }
 }

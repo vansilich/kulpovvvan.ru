@@ -103,6 +103,11 @@
                                         Поиск вхождения email-адресов и телефонов в имейлы менеджеров
                                     </a>
                                 </li>
+                                <li class="nav-item">
+                                    <a href="{{ route('triggersEntriesForm') }}" class="nav-link text-ali text-white {!! Route::current()->getName() == 'triggersEntriesForm'  ? 'active' : '' !!}" aria-current="page">
+                                        Поиск имейлов и телефонов по тригерам в имейлах менеджера
+                                    </a>
+                                </li>
                             </ul>
                         </li>
                     </ul>
@@ -120,6 +125,20 @@
                         <li class="nav-item">
                             <a href="{{ route('metrikaPrintPagesReportForm') }}" class="nav-link text-ali text-white {!! Route::current()->getName() == 'metrikaPrintPagesReportForm'  ? 'active' : '' !!}" aria-current="page">
                                 Распечатать данные посещаемости страниц
+                            </a>
+                        </li>
+                    </ul>
+
+                </li>
+
+                <li class="nav-item">
+                    <a class="link-dark text-decoration-none text-white" aria-current="page">
+                        <span class="fs-4">Dashboard</span>
+                    </a>
+                    <ul class="nav nav-pills flex-column mb-auto" style="margin-left: 20px">
+                        <li class="nav-item">
+                            <a href="{{ route('monthlyReportForm') }}" class="nav-link text-ali text-white {!! Route::current()->getName() == 'monthlyReportForm'  ? 'active' : '' !!}" aria-current="page">
+                                Ежемесячный SEO  отчет
                             </a>
                         </li>
                     </ul>

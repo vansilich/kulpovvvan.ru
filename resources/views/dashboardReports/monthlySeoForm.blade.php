@@ -4,13 +4,13 @@
 
     <h1>Ежемесячный SEO отчет</h1>
 
-    <form action="{{ route('comagicCallsReportHandler') }}" method="POST" class="w-50">
+    <form action="{{ route('monthlyReportHandle') }}" method="POST" class="w-50">
         @csrf
         <h1>Введите даты:</h1>
 
         <div class="text-light bg-secondary p-3 rounded">
             <h3>Документация</h3>
-            <p>Покащывает</p>
+            <p>Показывает</p>
         </div>
 
         @if ($errors->any())

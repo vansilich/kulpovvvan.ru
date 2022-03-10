@@ -30,9 +30,9 @@ class File
         });
     }
 
-    public function openStream(): void
+    public function openStream( string $mode = 'w+' ): void
     {
-        $this->stream = fopen($this->filePath, 'w+');
+        $this->stream = fopen($this->filePath, $mode);
     }
 
     public function closeStream(): void

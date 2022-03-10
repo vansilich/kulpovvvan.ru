@@ -15,7 +15,7 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        $schedule->command('url-reports:fetch-new')->daily();
+//        $schedule->command('url-reports:fetch-new')->daily();
 
         $schedule->command('queue:work --stop-when-empty')->withoutOverlapping();
         $schedule->command('queue:retry all')->everyFifteenMinutes();

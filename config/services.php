@@ -46,6 +46,10 @@ return [
     'mailganer' => [
         'key' => env('MAILGANER_API'),
         'sources' => explode(',', env('MAILGANER_SOURCE_IDS')),
+    ],
+
+    'roistat' => [
+        'key' => env('ROISTAT_API_KEY')
     ]
 
 ];

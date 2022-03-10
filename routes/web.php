@@ -10,7 +10,7 @@ use App\Http\Controllers\MetricaController;
 use App\Http\Controllers\ComagicController;
 use App\Http\Controllers\BigQueryController;
 use App\Http\Controllers\GmailController;
-use Illuminate\Support\Facades\Artisan;
+use App\Http\Controllers\DashboardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -70,4 +70,13 @@ Route::prefix('google')->group(function () {
 
     Route::get('gmail/report', [GmailController::class, 'emailsEntriesForm'])->name('emailsEntriesForm');
     Route::post('gmail/report', [GmailController::class, 'emailsEntriesHandle'])->name('emailsEntriesHandle');
+
+    Route::get('gmail/triggers', [GmailController::class, 'triggersEntriesForm'])->name('triggersEntriesForm');
+    Route::post('gmail/triggers', [GmailController::class, 'triggersEntriesHandle'])->name('triggersEntriesHandle');
+});
+
+Route::prefix('dashboard')->group(function () {
+
+    Route::get('monthly/report', [DashboardController::class, 'monthlyReportForm'])->name('monthlyReportForm');
+    Route::post('monthly/report', [DashboardController::class, 'monthlyReportHandle'])->name('monthlyReportHandle');
 });

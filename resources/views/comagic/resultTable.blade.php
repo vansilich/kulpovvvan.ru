@@ -18,8 +18,8 @@
             <tbody>
             @foreach($data as $row)
                 <tr>
-                    @foreach($row as $value)
-                        <th scope="row">{{ $value }}</th>
+                    @foreach( $columns as $column )
+                        <th scope="row">{!! $row->$column !!}</th>
                     @endforeach
                 </tr>
             @endforeach

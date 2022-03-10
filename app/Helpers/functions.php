@@ -51,7 +51,7 @@ if ( !function_exists('is_valid_email') ) {
      * @param string $email
      * @return bool
      */
-    function is_valid_email( string $email): bool
+    function is_valid_email( string $email ): bool
     {
         $pattern = "/^([a-z0-9_-]+\.)*[a-z0-9_-]*@([a-z0-9\-]+\.)+[a-z]{2,6}$/i";
 
@@ -85,22 +85,24 @@ if ( !function_exists('limitedFuncRetry') ) {
     /**
      * Функция для обработки API запросов, периодически отказывающих из-за throttling.
      *
-     * @param int $depth - количество попыток вызова
-     * @param int $shift - задержка в секундах перед вызовами
-     * @param callable $fn - функция, которая будет вызываться
-     * @return mixed
+     * @param int $depth - count of calls
+     * @param int $delay - delay in seconds
+     * @param callable $fn - function to be called
+     * @return mixed - $fn() result
      *
      * @throws Exception
      */
-    function limitedFuncRetry( int $depth, int $shift, callable $fn ): mixed
+    function limitedFuncRetry( int $depth, int $delay, callable $fn ): mixed
     {
-        for ($i = $depth; $depth >= 0; $i--) {
+        for ($i = $depth; $i > 0; $i--) {
 
             try {
                 return $fn();
             } catch ( Exception $exception ) {
-                sleep( $shift );
-                continue;
+                if ($i - 1 === 0) {
+                    throw $exception;
+                }
+                sleep( $delay );
             }
         }
 

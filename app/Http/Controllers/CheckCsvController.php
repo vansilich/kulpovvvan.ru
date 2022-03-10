@@ -18,7 +18,6 @@ class CheckCsvController extends Controller
 
     public function index(): View
     {
-        new Csv( storage_path('app/public') . '/testfile.csv');
         return view('checkCsv');
     }
 

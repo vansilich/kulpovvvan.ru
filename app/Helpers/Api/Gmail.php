@@ -43,11 +43,13 @@ class Gmail
     {
         $params = array_merge( [ 'maxResults' => 500 ], $params );
 
-        return $this->service->users_messages->listUsersMessages('me', $params);
+        return limitedFuncRetry(1,1,
+            fn() => $this->service->users_messages->listUsersMessages('me', $params)
+        );
     }
 
     /**
-     * Iterate list of messages and yield text from it
+     * Iterate list of messages and yield from, to addresses and text from it
      *
      * @param ListMessagesResponse $list
      * @return Generator
@@ -56,14 +58,21 @@ class Gmail
     public function messagesTextIterator( ListMessagesResponse $list ): Generator
     {
 
+        //TODO: Удалить это
+        dump( 'Количество писем ' . count($list->getMessages()) );
         foreach ($list->getMessages() as $message) {
             $message_id = $message->id;
 
-            $payload = $this->service->users_messages->get('me', $message_id, ['format' => 'full'])->getPayload();
+            //sometimes return '401 unauthorized' error
+            $payload = limitedFuncRetry(1, 1,
+                fn() => $this->service->users_messages->get('me', $message_id, ['format' => 'full'])->getPayload()
+            );
 
             $headers = $payload->getHeaders();
             $from = $this->getHeader($headers, 'From');
             $to = $this->getHeader($headers, 'To');
+
+            dump('Subject: ' . $this->getHeader($headers, 'Subject'));
 
             $text = $this->getEmailText($payload);
 
@@ -86,7 +95,14 @@ class Gmail
         return false;
     }
 
-    public function getHeader( $headers, $name ): string|bool
+    /**
+     * Returns email`s header value
+     *
+     * @param array $headers
+     * @param string $name
+     * @return string|bool
+     */
+    public function getHeader( array $headers, string $name ): string|bool
     {
         foreach ($headers as $header) {
             if ($header['name'] === $name) {
@@ -110,6 +126,7 @@ class Gmail
             if ( $messagePart->parts ) {
                 foreach ($messagePart->getParts() as $part) {
 
+                    //'$maybeText' because it can be string with text or 'false', if text not found
                     $maybeText = $this->getEmailText( $part );
                     if ( $maybeText ) return $maybeText;
                 }

@@ -10,6 +10,7 @@
         "ext-json": "*",
         "ext-pdo": "*",
         "ext-zip": "*",
+        "doctrine/dbal": "^3.3",
         "fruitcake/laravel-cors": "^2.0",
         "google/apiclient": "^2.12",
         "google/cloud-bigquery": "^1.23",
