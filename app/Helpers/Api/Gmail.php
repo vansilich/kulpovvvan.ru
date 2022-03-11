@@ -42,6 +42,8 @@ class Gmail
     public function queryMessages( array $params = [] ): ListMessagesResponse
     {
         $params = array_merge( [ 'maxResults' => 500 ], $params );
+        //TODO: Удалить
+        dump($params);
 
         return limitedFuncRetry(1,1,
             fn() => $this->service->users_messages->listUsersMessages('me', $params)
@@ -64,15 +66,11 @@ class Gmail
             $message_id = $message->id;
 
             //sometimes return '401 unauthorized' error
-            $payload = limitedFuncRetry(1, 1,
-                fn() => $this->service->users_messages->get('me', $message_id, ['format' => 'full'])->getPayload()
-            );
+            $payload = $this->service->users_messages->get('me', $message_id, ['format' => 'full'])->getPayload();
 
             $headers = $payload->getHeaders();
             $from = $this->getHeader($headers, 'From');
             $to = $this->getHeader($headers, 'To');
-
-            dump('Subject: ' . $this->getHeader($headers, 'Subject'));
 
             $text = $this->getEmailText($payload);
 

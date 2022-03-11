@@ -30,8 +30,7 @@ class GmailController extends Controller
 
         $emailsArr = explode("\r\n", $request->get('emails'));
 
-//        PhonesByTopDomains::dispatch( 'kir', $emailsArr )->delay( now()->addSecond() );
-        PhonesByTopDomains::dispatchSync( 'kir', $emailsArr )->delay( now()->addSecond() );
+        PhonesByTopDomains::dispatch( 'kir', $emailsArr )->delay( now()->addSecond() );
 
         return view('google/emailsEntriesForm')->with('success', 'Задача поставлена в очередь на выполнение');
     }

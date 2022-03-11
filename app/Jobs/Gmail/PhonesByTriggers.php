@@ -14,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Storage;
 
 class PhonesByTriggers implements ShouldQueue
 {
@@ -22,15 +23,17 @@ class PhonesByTriggers implements ShouldQueue
     private Gmail $gmail_api;
 
     private string $cacheFile;
+    private string $managerMail;
+
+    private array $params = [];
     private array $parsed_data = [];
     private array $triggers = [];
-    private string $managerMail;
 
     public function __construct(
         private string $managerAlias,
     ){
         $this->managerMail = Manager::where('nickname', $this->managerAlias)->first()->toArray()['mail'];
-        $this->cacheFile = storage_path("app/public/parse-phone-by-triggers/" . $this->managerAlias);
+        $this->cacheFile = storage_path("app/public/jobs/Gmail/PhonesByTriggers/cache/" . $this->managerAlias);
     }
 
     /**
@@ -56,19 +59,13 @@ class PhonesByTriggers implements ShouldQueue
      */
     private function messagesListIterator(): void
     {
-//        $triggers_count = count($this->triggers);
-
         foreach ($this->triggers as $key => $trigger) {
 
             //Searching by trigger in subject
-            $params = [ 'q' => "subject:$trigger" ];
-            unset( $this->triggers[ $key ] );
-
-            //TODO удалить
-//            dump( "Тригер $trigger; Осталось тригеров: " . $triggers_count - $key - 1);
+            $this->params['q'] = "subject:$trigger";
 
             do {
-                $messagesList = $this->gmail_api->queryMessages($params);
+                $messagesList = $this->gmail_api->queryMessages($this->params);
 
                 foreach ( $this->gmail_api->messagesTextIterator( $messagesList ) as $email_data) {
                     list('from' => $from, 'to' => $to, 'text' => $text) = $email_data;
@@ -90,21 +87,21 @@ class PhonesByTriggers implements ShouldQueue
 
                         $this->parsed_data[ $email ][ $trigger ][] = $phone;
                     }
-
                 }
 
-                $this->cacheState();
-
                 $nextPageToken = $messagesList->getNextPageToken();
-                $params = [ 'pageToken' => $nextPageToken ];
+                $this->params['pageToken'] = $nextPageToken;
 
+                $this->cacheState();
             } while ( $nextPageToken );
 
+            unset( $this->triggers[$key] );
+            $this->params = [];
         }
 
         //конец парсинга
         $name = sprintf("%s_%s.csv", $this->managerAlias, Carbon::now()->timestamp);
-        $csv = new Csv( storage_path("app/public/$name") );
+        $csv = new Csv( storage_path("app/public/jobs/Gmail/PhonesByTriggers/$name") );
         $csv->openStream();
 
         foreach ($this->parsed_data as $managerAlias => $triggers) {
@@ -113,10 +110,11 @@ class PhonesByTriggers implements ShouldQueue
                     $csv->insertRow([$managerAlias, $trigger, $phone]);
                 }
             }
-
         }
 
         $csv->closeStream();
+
+        Storage::disk('local')->delete('public/jobs/Gmail/PhonesByTriggers/cache/' . $this->managerAlias);
     }
 
     /**
@@ -126,7 +124,8 @@ class PhonesByTriggers implements ShouldQueue
     {
         file_put_contents( $this->cacheFile, serialize([
             'triggers' => $this->triggers,
-            'parsed_data' => $this->parsed_data
+            'parsed_data' => $this->parsed_data,
+            'pageToken' => $this->params['pageToken'] ?? null,
         ]));
     }
 
@@ -142,6 +141,7 @@ class PhonesByTriggers implements ShouldQueue
             if ( is_array($file_data) ) {
                 $this->triggers = $file_data['triggers'];
                 $this->parsed_data = $file_data['parsed_data'];
+                $this->params['pageToken'] = $file_data['pageToken'];
             }
         }
     }

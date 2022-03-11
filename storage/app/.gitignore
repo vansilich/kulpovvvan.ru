@@ -1,3 +1,7 @@
-*
-!public/
-!.gitignore
+**/*.csv
+public/manager_stats/*
+public/jobs/Gmail/PhonesByTriggers/cache/*
+public/jobs/Gmail/PhonesByTriggers/*.csv
+
+public/jobs/Gmail/PhonesByTopDomains/cache/*
+public/jobs/Gmail/PhonesByTopDomains/*.csv

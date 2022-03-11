@@ -23,6 +23,7 @@ class PhonesByTopDomains implements ShouldQueue, ShouldBeUnique
     private Gmail $gmail_api;
     private LoggerInterface $logger;
 
+    private array $params = [];
     private array $parsed_data = [];
     private array $email_regexps = [];
 
@@ -36,8 +37,11 @@ class PhonesByTopDomains implements ShouldQueue, ShouldBeUnique
      */
     public function handle()
     {
-        $this->setRegexps();
-        $this->getParsedData();
+        $this->getPreviousState();
+
+        if ( empty($this->email_regexps) ) {
+            $this->setRegexps();
+        }
 
         $this->gmail_api = new Gmail();
         $this->gmail_api->setClient( $this->managerAlias );
@@ -54,13 +58,11 @@ class PhonesByTopDomains implements ShouldQueue, ShouldBeUnique
 
         foreach ($this->email_regexps as $domain => $regexp) {
 
-            //Gmail regexp for searching
-            $params = [ 'q' => "from:(*@*$domain) OR to:(*@*$domain)" ];
+            //Выставление критериев поиска писем
+            $this->params['q'] = "from:(*@*$domain) OR to:(*@*$domain)";
 
             do {
-                $messagesList = $this->gmail_api->queryMessages( $params );
-
-//                dump($params);
+                $messagesList = $this->gmail_api->queryMessages( $this->params );
 
                 foreach ( $this->gmail_api->messagesTextIterator( $messagesList ) as $email_data) {
                     list('from' => $from, 'to' => $to, 'text' => $text) = $email_data;
@@ -82,22 +84,21 @@ class PhonesByTopDomains implements ShouldQueue, ShouldBeUnique
                             $this->parsed_data[ $email ][] = $phone;
                         }
                     }
-
                 }
 
-                //TODO: Можно удалить, это для дебагинга
-                $this->cacheState();
-
                 $nextPageToken = $messagesList->getNextPageToken();
-                $params = [ 'pageToken' => $nextPageToken ];
+                $this->params['pageToken'] = $nextPageToken;
 
+                $this->cacheState();
             } while ( $nextPageToken );
 
+            unset( $this->email_regexps[ $domain ] );
+            $this->params = [];
         }
 
         //конец парсинга
         $name = sprintf("%s_%s.csv", $this->managerAlias, Carbon::now()->timestamp);
-        $csv = new Csv(storage_path('app/public').'/'.$name );
+        $csv = new Csv( storage_path("app/jobs/Gmail/PhonesByTopDomains/$name") );
         $csv->openStream();
 
         foreach ($this->parsed_data as $manager => $phones) {
@@ -109,7 +110,7 @@ class PhonesByTopDomains implements ShouldQueue, ShouldBeUnique
         $csv->closeStream();
 
         //Удаляем кеш файл
-//        Storage::disk('local')->delete('public/parse-gmail/' . $this->managerAlias);
+        Storage::disk('local')->delete('public/jobs/Gmail/PhonesByTopDomains/cache/' . $this->managerAlias);
     }
 
     /**
@@ -117,28 +118,35 @@ class PhonesByTopDomains implements ShouldQueue, ShouldBeUnique
      */
     private function cacheState(): void
     {
-        $path = storage_path('app/public/parse-gmail/') . $this->managerAlias;
-        file_put_contents( $path, serialize($this->parsed_data) );
+        $path = storage_path('app/public/jobs/Gmail/PhonesByTopDomains/cache/') . $this->managerAlias;
+        file_put_contents( $path, serialize([
+            'parsed_data' => $this->parsed_data,
+            'email_regexps' => $this->email_regexps,
+            'pageToken' => $this->params['pageToken'] ?? null,
+        ]) );
     }
 
     /**
      * Получает спарсенные данные из файла
      */
-    private function getParsedData(): void
+    private function getPreviousState(): void
     {
-        $path = storage_path('app/public/parse-gmail/') . $this->managerAlias;
+        $path = storage_path('app/public/jobs/Gmail/PhonesByTopDomains/cache/') . $this->managerAlias;
 
         if ( file_exists( $path ) ) {
 
             $file_data = unserialize( file_get_contents( $path ) );
             if ( is_array($file_data) ) {
-                $this->parsed_data = $file_data;
+                $this->parsed_data = $file_data['parsed_data'];
+                $this->email_regexps = $file_data['email_regexps'];
+                $this->params['pageToken'] = $file_data['pageToken'];
             }
         }
     }
 
     /**
-     * Set to every given domain regexp for searching it and itself of 1 level up in mail text
+     * Формирует для каждого переданного домена регулярное выражение, которое ищет совпадения
+     * для почты с таким же доменом, либо доменом на 1 уровень выше
      */
     private function setRegexps(): void
     {
