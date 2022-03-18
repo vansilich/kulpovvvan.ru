@@ -20,11 +20,4 @@ class MailgunerControllerTest extends TestCase
         $response->assertStatus(200);
         $response->assertViewIs('mailganer.unsubForm');
     }
-
-    public function test_success_handleUnsub()
-    {
-        $response = $this->get( route('handleUnsub') );
-
-        $response->assertStatus(200);
-    }
 }

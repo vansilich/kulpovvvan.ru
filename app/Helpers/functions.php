@@ -76,7 +76,7 @@ if ( !function_exists('decodeGmailBody') ) {
             return false;
         }
 
-        return $decodedMessage;
+        return urldecode($decodedMessage);
     }
 }
 
@@ -85,10 +85,10 @@ if ( !function_exists('limitedFuncRetry') ) {
     /**
      * Функция для обработки API запросов, периодически отказывающих из-за throttling.
      *
-     * @param int $depth - count of calls
-     * @param int $delay - delay in seconds
-     * @param callable $fn - function to be called
-     * @return mixed - $fn() result
+     * @param int $depth - количество вызовов
+     * @param int $delay - задержка между вызовами в секундах
+     * @param callable $fn - функция, которая будет вызываться
+     * @return mixed - результат вызова $fn()
      *
      * @throws Exception
      */

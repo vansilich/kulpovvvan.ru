@@ -25,8 +25,10 @@ class MailgunerController extends Controller
         $emails_arr = explode( "\r\n", $request->get('emails'));
 
         $failed_emails = [];
+        $mailganer = new Mailganer();
+
         foreach ($emails_arr as $email) {
-            if ( !Mailganer::unsubscribe($email) ) {
+            if ( !$mailganer->unsubscribe($email) ) {
                 $failed_emails[] = $email;
             }
         }

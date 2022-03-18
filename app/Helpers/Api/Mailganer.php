@@ -13,7 +13,7 @@ class Mailganer
 
     public static string $api_breakpoint = 'https://mailganer.com/api/v2/';
 
-    public static function unsubscribe($email): bool
+    public function unsubscribe($email): bool
     {
         $api_key = config('services.mailganer.key');
         $sources = config('services.mailganer.sources');
@@ -45,7 +45,7 @@ class Mailganer
         return true;
     }
 
-    public static function unsubscribeFromList( $email, $source )
+    public function unsubscribeFromList( $email, $source )
     {
         $path = self::$api_breakpoint . "emails/unsubscribe/";
         $api_key = config('services.mailganer.key');
@@ -65,9 +65,9 @@ class Mailganer
     }
 
     /**
-     * @throws Throwable
+     * @throws GuzzleException
      */
-    public static function subscriberInfo( array $data )
+    public function subscriberInfo( array $data )
     {
         $api_key = config('services.mailganer.key');
 
@@ -77,7 +77,7 @@ class Mailganer
 
         $client = new Client([
             'headers' => [
-                'Authorization' => "CodeRequest ${api_key}",
+                'Authorization' => "CodeRequest $api_key",
             ]
         ]);
 
@@ -89,7 +89,7 @@ class Mailganer
     /**
      * @throws GuzzleException
      */
-    public static function subscribeToList($email, $source )
+    public function subscribeToList($email, $source )
     {
         $api_key = config('services.mailganer.key');
 

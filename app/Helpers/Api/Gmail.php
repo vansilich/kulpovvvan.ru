@@ -42,16 +42,12 @@ class Gmail
     public function queryMessages( array $params = [] ): ListMessagesResponse
     {
         $params = array_merge( [ 'maxResults' => 500 ], $params );
-        //TODO: Удалить
-        dump($params);
 
-        return limitedFuncRetry(1,1,
-            fn() => $this->service->users_messages->listUsersMessages('me', $params)
-        );
+        return $this->service->users_messages->listUsersMessages('me', $params);
     }
 
     /**
-     * Iterate list of messages and yield from, to addresses and text from it
+     * Iterate list of messages and yield from, to addresses and text/plain part from it
      *
      * @param ListMessagesResponse $list
      * @return Generator
@@ -60,8 +56,6 @@ class Gmail
     public function messagesTextIterator( ListMessagesResponse $list ): Generator
     {
 
-        //TODO: Удалить это
-        dump( 'Количество писем ' . count($list->getMessages()) );
         foreach ($list->getMessages() as $message) {
             $message_id = $message->id;
 
@@ -71,10 +65,20 @@ class Gmail
             $headers = $payload->getHeaders();
             $from = $this->getHeader($headers, 'From');
             $to = $this->getHeader($headers, 'To');
+            $subject = $this->getHeader( $headers, 'Subject' );
 
-            $text = $this->getEmailText($payload);
+            /*
+             * In $payload we have parts property - array of parts. First part - main body. Usually email has only one part.
+             * But if '---------- Forwarded message ----------' text presented in body,
+             * it is stored in other parts. And we need to implode them to main text in 1st part.
+             */
+            $text = '';
+            foreach ( $payload->getParts() as $part ) {
+                $text .= $this->getEmailText($part);
+            }
 
             yield [
+                'subject' => $subject,
                 'from' => $from,
                 'to' => $to,
                 'text' => $text,
@@ -82,6 +86,12 @@ class Gmail
         }
     }
 
+    /**
+     * Return timestamp of email send date
+     *
+     * @param string $dateFromHeader
+     * @return bool|int
+     */
     private function getMailTimestamp( string $dateFromHeader ): bool|int
     {
         $is_date = preg_match('#(\w{3},\s+)?\d+ \w+ \d+ \d+:\d+:\d+#', $dateFromHeader, $matches);
@@ -94,7 +104,7 @@ class Gmail
     }
 
     /**
-     * Returns email`s header value
+     * Return email`s header value
      *
      * @param array $headers
      * @param string $name
@@ -119,7 +129,8 @@ class Gmail
     public function getEmailText( MessagePart $messagePart ): string|bool
     {
 
-        if ($messagePart->mimeType !== 'text/plain') {
+        // 'text/html' for more correct parsing. 'text/plain' parts sometimes incorrectly imploding words
+        if ($messagePart->mimeType !== 'text/html') {
 
             if ( $messagePart->parts ) {
                 foreach ($messagePart->getParts() as $part) {
