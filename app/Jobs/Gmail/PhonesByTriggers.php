@@ -10,94 +10,62 @@ use App\Models\Manager;
 use Carbon\Carbon;
 use Exception;
 use Generator;
+use Google\Service\Gmail\ListMessagesResponse;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 class PhonesByTriggers implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    private Gmail $gmail_api;
+    private Cache $cache;
+    private Gmail $gmailAPI;
+    private ListMessagesResponse $messagesList;
 
-    private string $cacheFile;
     private string $managerMail;
 
-    private array $params = [];
-    private array $triggers = [];
+    private string $triggersCacheKey;
+    private string $pageTokenCacheKey;
+    private string $messagesListCacheKey;
+
+    private ?array $triggers = [];
 
     public function __construct(
         private string $managerAlias,
     ){
         $this->managerMail = Manager::where('nickname', $this->managerAlias)->first()->toArray()['mail'];
-        $this->cacheFile = storage_path("app/public/jobs/Gmail/PhonesByTriggers/cache/" . $this->managerAlias);
+
+        $this->triggersCacheKey = $this->managerAlias . '_PhonesByTriggers_triggers';
+        $this->pageTokenCacheKey = $this->managerAlias . '_PhonesByTriggers_pageToken';
+        $this->messagesListCacheKey = $this->managerAlias . '_PhonesByTriggers_messagesList';
     }
 
     /**
      * @throws Exception
      */
-    public function handle(Gmail $gmail)
+    public function handle( Gmail $gmail, Cache $cache )
     {
-        $this->getParsedData();
+        $this->cache = $cache;
+        $this->triggers = $cache::get( $this->triggersCacheKey );
 
         if ( empty($this->triggers) ) {
             $this->setupTriggers();
         }
 
-        $this->gmail_api = $gmail;
-        $this->gmail_api->setClient( $this->managerAlias );
-        $this->gmail_api->setupService();
+        $this->gmailAPI = $gmail;
+        $this->gmailAPI->setClient( $this->managerAlias );
+        $this->gmailAPI->setupService();
 
-        $name = sprintf("%s.csv", $this->managerAlias);
-        $csv = new Csv( storage_path("app/public/jobs/Gmail/PhonesByTriggers/$name") );
-        $file_exists = file_exists( $csv->filePath );
-
-        $csv->openStream('a');
-
-        //setup headers in file
-        if ( !$file_exists ) {
-            $csv->insertRow(['trigger', 'email', 'from', 'to', 'emails', 'phones']);
-        }
-
-        $this->storeParsedData( $csv );
-
+        $csv = $this->setupResultFile();
+        $this->messagesListIterator( $csv );
         $csv->closeStream();
 
-        //clear cache
-        Storage::disk('local')->delete("public/jobs/Gmail/PhonesByTriggers/cache/$this->managerAlias");
-    }
-
-    /**
-     * @throws Exception
-     */
-    private function storeParsedData(Csv $csv): void
-    {
-        //iterate and save api data
-        foreach ( $this->messagesListIterator() as $parsed_data){
-
-            if ( empty($parsed_data) ) {
-                continue;
-            }
-
-            foreach ($parsed_data as $trigger => $data) {
-                foreach ($data as $email => $values) {
-                    foreach ($values as $value) {
-
-                        $csv->insertRow([
-                            $trigger,
-                            $email,
-                            $value['from'],
-                            $value['to'],
-                            $value['emails'] ? implode("\n", $value['emails']) : null,
-                            $value['phones'] ? implode("\n", $value['phones']) : null,
-                        ]);
-                    }
-                }
-            }
-        }
+        $this->clearAllJobCache();
     }
 
     /**
@@ -105,7 +73,7 @@ class PhonesByTriggers implements ShouldQueue
      *
      * @throws Exception
      */
-    private function messagesListIterator(): Generator
+    private function messagesListIterator( Csv $csv )
     {
 
         foreach ($this->triggers as $key => $trigger) {
@@ -113,14 +81,19 @@ class PhonesByTriggers implements ShouldQueue
             $parsed_data = [];
 
             //Searching by trigger in subject
-            $this->params['q'] = "subject:$trigger";
+            $params = [
+                'q' => "subject:$trigger",
+                'pageToken' => $this->cache::get( $this->pageTokenCacheKey )
+            ];
 
             do {
-                $messagesList = $this->gmail_api->queryMessages($this->params);
+                /** @var ListMessagesResponse|null $cachedMessagesList */
+                $cachedMessagesList = $this->cache::get( $this->messagesListCacheKey );
+                $this->messagesList = $cachedMessagesList ?: $this->gmailAPI->queryMessages($params);
 
-                foreach ( $this->gmail_api->messagesTextIterator( $messagesList ) as $email_data) {
+                foreach ( $this->gmailAPI->messagesTextIterator( $this->messagesList ) as $email_data) {
 
-                    list('from' => $from, 'to' => $to, 'text' => $text) = $email_data;
+                    list('subject' => $subject, 'from' => $from, 'to' => $to, 'text' => $text) = $email_data;
 
                     $externalEmail = preg_match( '#'.preg_quote($this->managerMail).'#u', $from) ? $to : $from;
                     $email = Email::searchByRegexp( $externalEmail );
@@ -137,48 +110,68 @@ class PhonesByTriggers implements ShouldQueue
                         'emails' => $emails[0] ? array_unique($emails[0]) : null,
                         'phones' => $phones[0] ? array_unique($phones[0]) : null
                     ];
+
+                    $this->cacheRemainingMessagesList();
                 }
 
-                $nextPageToken = $messagesList->getNextPageToken();
-                $this->params['pageToken'] = $nextPageToken;
+                $nextPageToken = $this->messagesList->getNextPageToken();
+                $params['pageToken'] = $nextPageToken;
+
+                $this->cache::put( $this->pageTokenCacheKey, $nextPageToken );
+                $this->cache::forget( $this->messagesListCacheKey );
 
             } while ( $nextPageToken );
 
-            unset( $this->triggers[$key], $this->params );
+            unset( $this->triggers[$key], $params );
+            $this->cache::put( $this->triggersCacheKey, $this->triggers );
 
-            $this->cacheState();
-            yield $parsed_data;
-        }
-    }
+            if( !isset($parsed_data[$trigger]) ) {
+                continue;
+            }
 
-    /**
-     * Serialize parsed data
-     */
-    private function cacheState(): void
-    {
-        file_put_contents( $this->cacheFile, serialize([
-            'triggers' => $this->triggers,
-            'pageToken' => $this->params['pageToken'] ?? null,
-        ]));
-    }
+            //saving results
+            foreach ($parsed_data[$trigger] as $email => $values) {
+                foreach ($values as $value) {
 
-    /**
-     * Get previous parsed data of this job
-     */
-    private function getParsedData(): void
-    {
-
-        if ( file_exists( $this->cacheFile ) ) {
-
-            $file_data = unserialize( file_get_contents( $this->cacheFile ));
-            if ( is_array($file_data) ) {
-                $this->triggers = $file_data['triggers'];
-                $this->params['pageToken'] = $file_data['pageToken'];
+                    $csv->insertRow([
+                        $trigger,
+                        $email,
+                        $value['from'],
+                        $value['to'],
+                        $value['emails'] ? implode("\n", $value['emails']) : null,
+                        $value['phones'] ? implode("\n", $value['phones']) : null,
+                    ]);
+                }
             }
         }
     }
 
-    private function setupTriggers()
+    private function setupResultFile(): Csv
+    {
+        $name = sprintf("%s.csv", $this->managerAlias);
+        $csv = new Csv( storage_path("app/public/jobs/Gmail/PhonesByTriggers/$name") );
+        $file_exists = file_exists( $csv->filePath );
+
+        $csv->openStream('a');
+
+        //setup headers in file
+        if ( !$file_exists ) {
+            $csv->insertRow(['trigger', 'email', 'from', 'to', 'emails', 'phones']);
+        }
+
+        return $csv;
+    }
+
+    private function cacheRemainingMessagesList(): void
+    {
+        $messagesListArray = $this->messagesList->getMessages();
+        array_shift($messagesListArray);
+        $this->messagesList->setMessages( $messagesListArray );
+
+        $this->cache::put( $this->messagesListCacheKey, $this->messagesList );
+    }
+
+    private function setupTriggers(): void
     {
         $triggers = new Csv( base_path('data/output.csv') );
         $triggers->openStream('r');
@@ -189,6 +182,13 @@ class PhonesByTriggers implements ShouldQueue
         }
 
         $triggers->closeStream();
+    }
+
+    private function clearAllJobCache(): void
+    {
+        $this->cache::forget($this->triggersCacheKey);
+        $this->cache::forget($this->pageTokenCacheKey);
+        $this->cache::forget($this->messagesListCacheKey);
     }
 
 }

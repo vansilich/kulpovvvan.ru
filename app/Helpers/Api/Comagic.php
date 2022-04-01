@@ -29,8 +29,9 @@ class Comagic
      * @param string $date_from - дата начала отчета
      * @param string $date_till - дата конца отчета
      * @param array $fields - массив полей, которые должны быть в отчете
+     * @param array $filter - массив филтров
      */
-    public function getReport( string $api_method, string $date_from, string $date_till, array $fields, $filter = [] ): stdClass
+    public function getReport(string $api_method, string $date_from, string $date_till, array $fields, array $filter = [] ): stdClass
     {
         $client = new Client([
             'headers' => [
@@ -58,15 +59,14 @@ class Comagic
 
         try {
             $response = $client->post( $this->api_endpoint, [RequestOptions::JSON => $query] );
-
-        } catch (GuzzleException $err) {
+        } catch ( GuzzleException $err ) {
             $this->errorLogger->error( $err->getMessage() );
         }
 
         $response = json_decode( $response->getBody()->getContents() );
 
         if ( isset( $response->error ) ) {
-            $this->errorLogger->error( print_r($response, true) );
+            $this->errorLogger->error( print_r($response->error->message, true) );
         }
 
         return $response;

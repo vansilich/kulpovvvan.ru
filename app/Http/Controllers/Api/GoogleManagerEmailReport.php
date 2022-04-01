@@ -18,6 +18,6 @@ class GoogleManagerEmailReport extends Controller
     {
         $data = $request->json()->all();
 
-        CheckManagerNewSubs::dispatch( $data )->delay( now()->addSecond() );
+        CheckManagerNewSubs::dispatch( $data )->onQueue('mailganer')->delay( now()->addSecond() );
     }
 }

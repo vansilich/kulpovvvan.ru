@@ -2,32 +2,22 @@
 
 namespace App\Helpers\Api;
 
+use App\Helpers\Email;
 use Exception;
 use Generator;
-use Carbon\Carbon;
+use Google\Service\Gmail\ListHistoryResponse;
+use Google\Service\Gmail\Message;
+use Google\Service\Gmail\MessagePartHeader;
 use Google_Client;
 use Google_Service_Gmail;
-use JetBrains\PhpStorm\NoReturn;
-use Psr\Log\LoggerInterface;
-use Illuminate\Support\Facades\Log;
 use Google\Service\Gmail\MessagePart;
-use Illuminate\Support\Facades\Cache;
 use Google\Service\Gmail\ListMessagesResponse;
 
 class Gmail
 {
 
     public Google_Client $client;
-    private LoggerInterface $logger;
     public Google_Service_Gmail $service;
-
-    /**
-     * @throws Exception
-     */
-    public function __construct()
-    {
-       $this->logger = Log::build(['driver' => 'single', 'path' => storage_path('logs/api/gmail/runtime.log') ]);
-    }
 
     public function setupService(): void
     {
@@ -60,17 +50,20 @@ class Gmail
             $message_id = $message->id;
 
             //sometimes return '401 unauthorized' error
-            $payload = $this->service->users_messages->get('me', $message_id, ['format' => 'full'])->getPayload();
+            $message = $this->service->users_messages->get('me', $message_id, ['format' => 'full']);
+            $payload = $message->getPayload();
 
             $headers = $payload->getHeaders();
+
             $from = $this->getHeader($headers, 'From');
             $to = $this->getHeader($headers, 'To');
             $subject = $this->getHeader( $headers, 'Subject' );
+            $timestamp = $message->getInternalDate();
 
             /*
              * In $payload we have parts property - array of parts. First part - main body. Usually email has only one part.
              * But if '---------- Forwarded message ----------' text presented in body,
-             * it is stored in other parts. And we need to implode them to main text in 1st part.
+             * it is stored in other parts. And we need to include them to main text in 1st part.
              */
             $text = '';
             foreach ( $payload->getParts() as $part ) {
@@ -82,35 +75,58 @@ class Gmail
                 'from' => $from,
                 'to' => $to,
                 'text' => $text,
+                'timestamp' => $timestamp
             ];
         }
     }
 
-    /**
-     * Return timestamp of email send date
-     *
-     * @param string $dateFromHeader
-     * @return bool|int
-     */
-    private function getMailTimestamp( string $dateFromHeader ): bool|int
+//    public function forwardMessage( Message $message, string $toAddress )
+//    {
+//        $raw = $this->messageById( $message->getId(), ['format' => 'raw'] );
+//        $decodedRaw = decodeGmailBody($raw->raw);
+//
+//        $payload = $message->getPayload();
+//        $oldHeaders = $payload->getHeaders();
+//
+//        $newHeaders[] = $this->createHeader( 'To', $toAddress );
+//        $newHeaders[] = $this->createHeader( 'MIME-Version', '1.0' );
+//        $newHeaders[] = $this->createHeader( 'From', $this->getHeader($oldHeaders, 'From') );
+//        $newHeaders[] = $this->createHeader( 'Date', $this->getHeader($oldHeaders, 'Date') );
+//
+//        $oldSubject = $this->getHeader($oldHeaders, 'Subject');
+//        $newHeaders[] = $this->createHeader( 'Subject', iconv_mime_encode( 'Subject', $oldSubject, ['input-charset' => 'UTF-8', 'output-charset' => 'UTF-8']) );
+//
+//        $newHeaders[] = $this->createHeader( 'Content-Type', $this->getHeader($oldHeaders, 'Content-Type') );
+//
+//        $newRawMessage = $this->replaceHeadersInRaw($decodedRaw, $newHeaders);
+//
+//        $newMessage = new Message();
+//        $payload->setHeaders( $newHeaders );
+//        $newMessage->setPayload( $payload );
+//
+//        $newMessage->setRaw( $newRawMessage );
+//        $this->service->users_messages->send( 'me', $newMessage);
+//    }
+
+    public function historyList( array $params ): ListHistoryResponse
     {
-        $is_date = preg_match('#(\w{3},\s+)?\d+ \w+ \d+ \d+:\d+:\d+#', $dateFromHeader, $matches);
+        return $this->service->users_history->listUsersHistory('me', $params);
+    }
 
-        if ( $is_date ) {
-            return (int) ( Carbon::parse( $matches[0] ))->timestamp;
-        }
-
-        return false;
+    public function messageById( string $id, array $opt_params = [] ): Message
+    {
+        $params = array_merge( ['format' => 'full'], $opt_params);
+        return $this->service->users_messages->get( 'me', $id, $params);
     }
 
     /**
      * Return email`s header value
      *
-     * @param array $headers
+     * @param MessagePartHeader[] $headers
      * @param string $name
-     * @return string|bool
+     * @return string|false
      */
-    public function getHeader( array $headers, string $name ): string|bool
+    public function getHeader( array $headers, string $name ): string|false
     {
         foreach ($headers as $header) {
             if ($header['name'] === $name) {
@@ -121,10 +137,47 @@ class Gmail
     }
 
     /**
+     * @param string $key
+     * @param mixed $value
+     * @return MessagePartHeader
+     */
+    public function createHeader( string $key, mixed $value ): MessagePartHeader
+    {
+        $header = new MessagePartHeader();
+        $header->setName($key);
+        $header->setValue($value);
+
+        return $header;
+    }
+
+    /**
+     * @param MessagePartHeader[] $headers
+     * @return string|false
+     */
+    public function getFromAddress( array $headers ): string|false
+    {
+        $from = $this->getHeader( $headers, 'From' );
+        $matches = Email::searchByRegexp( $from );
+        return !empty($matches[0])
+            ? $matches[0][0]
+            : false;
+    }
+
+    /**
+     * @param MessagePartHeader[] $headers
+     * @return string|false
+     */
+    public function getToAddress( array $headers ): string|false
+    {
+        $to = $this->getHeader( $headers, 'To' );
+        $matches = Email::searchByRegexp( $to );
+        return !empty($matches[0])
+            ? $matches[0][0]
+            : false;
+    }
+
+    /**
      * Retrieve 'text/plain' part from message
-     *
-     * @param MessagePart $messagePart
-     * @return string|bool
      */
     public function getEmailText( MessagePart $messagePart ): string|bool
     {
@@ -132,7 +185,7 @@ class Gmail
         // 'text/html' for more correct parsing. 'text/plain' parts sometimes incorrectly imploding words
         if ($messagePart->mimeType !== 'text/html') {
 
-            if ( $messagePart->parts ) {
+            if ( isset($messagePart->parts) ) {
                 foreach ($messagePart->getParts() as $part) {
 
                     //'$maybeText' because it can be string with text or 'false', if text not found
@@ -155,7 +208,7 @@ class Gmail
     {
         $client = new Google_Client();
         $client->setApplicationName('Gmail API PHP Quickstart');
-        $client->setScopes(Google_Service_Gmail::GMAIL_READONLY);
+        $client->setScopes(Google_Service_Gmail::GMAIL_MODIFY);
         $client->setAuthConfig(base_path() . '/credentials/google/gmail/credentials.json');
         $client->setAccessType('offline');
         $client->setPrompt('select_account consent');
@@ -187,7 +240,7 @@ class Gmail
                 throw new Exception("Аккаунт с именем $clientName не залогинен. Обновитие токен через artisan команду ", 500);
             }
             // Save the token to a file.
-            if ( !file_exists( dirname($tokenPath)) ) {
+            if ( !file_exists(dirname($tokenPath)) ) {
                 mkdir( dirname($tokenPath), 0700, true);
             }
             file_put_contents( $tokenPath, json_encode($client->getAccessToken()) );
@@ -195,5 +248,30 @@ class Gmail
 
         $this->client = $client;
     }
+
+    /**
+     * @param string $rawMessage
+     * @param MessagePartHeader[] $newHeaders
+     * @return string
+     */
+//    public function replaceHeadersInRaw( string $rawMessage, array $newHeaders ): string
+//    {
+//        /*
+//         * Parts in $rawMessage separated by empty lines and so 1 part is always Mail headers,
+//         * as it is described in RFC-822
+//         */
+//        $explodedMessage = explode("\r\n\r\n", $rawMessage);
+//        $rawHeaders = '';
+//        foreach ( $newHeaders as $header ) {
+//            $rawHeaders .= sprintf("%s: %s;\r\n", $header->name, $header->value);
+//        }
+//        $explodedMessage[0] = $rawHeaders;
+//
+//        $raw = implode("\r\n", $explodedMessage);
+//
+//        dd($raw);
+//
+//        return strtr( base64_encode($raw), '-_', '+/' );
+//    }
 
 }

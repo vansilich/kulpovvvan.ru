@@ -69,8 +69,7 @@ if ( !function_exists('decodeGmailBody') ) {
      */
     function decodeGmailBody( $rawData ): bool|string
     {
-        $sanitizedData = strtr($rawData, '-_', '+/');
-        $decodedMessage = base64_decode($sanitizedData);
+        $decodedMessage = base64_decode(strtr($rawData, '-_', '+/'));
 
         if( !$decodedMessage ){
             return false;

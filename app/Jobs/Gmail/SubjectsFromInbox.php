@@ -8,42 +8,44 @@ use App\Helpers\Email;
 use App\Helpers\Phone;
 use App\Models\Manager;
 use Exception;
-use Generator;
+use Google\Service\Gmail\ListMessagesResponse;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
 
 class SubjectsFromInbox implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    private string $cacheFile;
     private string $managerMail;
+    private string $pageTokenCacheKey;
+    private string $messagesListCacheKey;
 
-    private Gmail $gmail_api;
-    private array $params;
+    private ListMessagesResponse $messagesList;
+
+    private Gmail $gmailAPI;
 
     public function __construct(
         private string $managerAlias,
     ) {
         $this->managerMail = Manager::where('nickname', $this->managerAlias)->first()->toArray()['mail'];
-        $this->cacheFile = storage_path("app/public/jobs/Gmail/SubjectsFromInbox/cache/" . $this->managerAlias);
+
+        $this->pageTokenCacheKey = $this->managerAlias . '_SubjectsFromInbox_pageToken';
+        $this->messagesListCacheKey = $this->managerAlias . '_SubjectsFromInbox_messagesList';
     }
 
     /**
      * @throws Exception
      */
-    public function handle(Gmail $gmail )
+    public function handle( Gmail $gmail, Cache $cache )
     {
-        $this->getParsedData();
-
-        $this->gmail_api = $gmail;
-        $this->gmail_api->setClient( $this->managerAlias );
-        $this->gmail_api->setupService();
+        $this->gmailAPI = $gmail;
+        $this->gmailAPI->setClient( $this->managerAlias );
+        $this->gmailAPI->setupService();
 
         $name = sprintf("%s.csv", $this->managerAlias);
         $csv = new Csv( storage_path("app/public/jobs/Gmail/SubjectsFromInbox/$name") );
@@ -53,34 +55,40 @@ class SubjectsFromInbox implements ShouldQueue
 
         //setup headers in file
         if ( !$file_exists ) {
-            $csv->insertRow(['trigger', 'subject', 'email', 'from', 'to', 'emails', 'phones']); //TODO исправить заголовки
+            $csv->insertRow(['trigger', 'subject', 'email', 'from', 'to', 'emails', 'phones']);
         }
 
-        $this->messagesListIterator( $csv );
+        $this->messagesListIterator( $csv, $cache );
 
         $csv->closeStream();
 
         //clear cache
-        Storage::disk('local')->delete("public/jobs/Gmail/SubjectsFromInbox/cache/$this->managerAlias");
+        $cache::forget( $this->messagesListCacheKey );
+        $cache::forget( $this->pageTokenCacheKey );
     }
 
     /**
      * @throws Exception
      */
-    public function messagesListIterator( Csv $csv ): void
+    public function messagesListIterator( Csv $csv, Cache $cache ): void
     {
-
         //Searching all emails by all time
-        $this->params['q'] = "";
+        $params = [
+            "q" => '',
+            'pageToken' => $cache::get( $this->pageTokenCacheKey )
+        ];
 
         do {
-            $messagesList = $this->gmail_api->queryMessages($this->params);
 
-            foreach ( $this->gmail_api->messagesTextIterator( $messagesList ) as $email_data ) {
+            /** @var ListMessagesResponse|null $cachedMessagesList */
+            $cachedMessagesList = $cache::get( $this->messagesListCacheKey );
+            $this->messagesList = $cachedMessagesList ?: $this->gmailAPI->queryMessages($params);
 
-                list( 'subject' => $subject, 'from' => $from, 'to' => $to, 'text' => $text) = $email_data;
+            foreach ( $this->gmailAPI->messagesTextIterator( $this->messagesList ) as $email_data ) {
 
-                $externalEmail = preg_match( '#'.preg_quote($this->managerMail).'#u', $from) ? $to : $from;
+                $externalEmail = preg_match( '#'.preg_quote($this->managerMail).'#u', $email_data['from'])
+                    ? $email_data['to']
+                    : $email_data['from'];
                 $email = Email::searchByRegexp( $externalEmail );
 
                 if ( empty($email[0]) ) {
@@ -89,61 +97,48 @@ class SubjectsFromInbox implements ShouldQueue
 
                 $email = mb_strtolower($email[0][0], 'UTF-8');
 
-                $phones = $this->phonesToUniqueArray( $text );
-                $emails = $this->emailsToUniqueArray( $text );
-
-                $trigger = $this->matchTrigger( $subject );
+                $phones = $this->phonesToUniqueArray( $email_data['text'] );
+                $emails = $this->emailsToUniqueArray( $email_data['text'] );
+                $trigger = $this->matchTriggerInSubject( $email_data['subject'] );
 
                 $csv->insertRow([
                     $trigger,
-                    $subject,
+                    $email_data['subject'],
                     $email,
-                    $from,
-                    $to,
+                    $email_data['from'],
+                    $email_data['to'],
                     $emails ? implode("\n", $emails) : null,
                     $phones ? implode("\n", $phones) : null,
                 ]);
+
+                $this->cacheRemainingMessagesList( $cache );
             }
 
-            $nextPageToken = $messagesList->getNextPageToken();
-            $this->params['pageToken'] = $nextPageToken;
+            $nextPageToken = $this->messagesList->getNextPageToken();
+            $params['pageToken'] = $nextPageToken;
 
-            $this->cacheState();
+            $cache::put( $this->pageTokenCacheKey, $nextPageToken );
+            $cache::forget( $this->messagesListCacheKey );
+
         } while ( $nextPageToken );
 
     }
 
-    private function matchTrigger( string $mailSubject ): ?string
+    private function cacheRemainingMessagesList( Cache $cache ): void
+    {
+        $messagesListArray = $this->messagesList->getMessages();
+        array_shift($messagesListArray);
+        $this->messagesList->setMessages( $messagesListArray );
+
+        $cache::put( $this->messagesListCacheKey, $this->messagesList );
+    }
+
+    private function matchTriggerInSubject( string $mailSubject ): ?string
     {
         $regexp = "#\#[a-z0-9]+#i";
 
         preg_match( $regexp, $mailSubject, $trigger );
         return $trigger[0] ?? null;
-    }
-
-    /**
-     * Serialize parsed data
-     */
-    private function cacheState(): void
-    {
-        file_put_contents( $this->cacheFile, serialize([
-            'pageToken' => $this->params['pageToken'] ?? null,
-        ]));
-    }
-
-    /**
-     * Get previous parsed data of this job
-     */
-    private function getParsedData(): void
-    {
-
-        if ( file_exists( $this->cacheFile ) ) {
-
-            $file_data = unserialize( file_get_contents( $this->cacheFile ));
-            if ( is_array($file_data) ) {
-                $this->params['pageToken'] = $file_data['pageToken'];
-            }
-        }
     }
 
     private function phonesToUniqueArray( string $mailText ): ?array

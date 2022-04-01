@@ -39,7 +39,7 @@ class PushJobToTheQueue extends Command
             $job = forward_static_call_array([$jobClassName, "dispatch"], $jobConstructorArgs);
             $job->delay( now()->addSecond() );
 
-            echo "Job pushed to the jobs table";
+            echo "Job pushed to the jobs table\n";
             return 0;
         }
 

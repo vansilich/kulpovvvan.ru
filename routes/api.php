@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\GmailNewEventController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\GoogleManagerEmailReport;
@@ -18,6 +19,7 @@ use App\Http\Controllers\Api\GmailOauthCallback;
 
 Route::post('/google/manager-email-report', GoogleManagerEmailReport::class);
 Route::get('/google/gmail/handle-oauth', [GmailOauthCallback::class, 'printCode'])->name('gmailOauth');
+Route::post('/google/gmail/new-event', GmailNewEventController::class);
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
