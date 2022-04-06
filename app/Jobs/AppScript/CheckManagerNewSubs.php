@@ -39,8 +39,8 @@ class CheckManagerNewSubs implements ShouldQueue
         $debug_logger = Log::build(['driver' => 'single', 'path' => storage_path('logs/jobs/CheckManagerNewSubs/debug.log')]);
 
         $input_logger->debug( serialize([
-            'emails' => $this->emails,
-            'manager' => $this->manager
+                'emails' => $this->emails,
+                'manager' => $this->manager
             ])
         );
 
@@ -70,6 +70,10 @@ class CheckManagerNewSubs implements ShouldQueue
             foreach ($managers as $value) {
 
                 $res = $mailganer->subscriberInfo( [ 'email' => $email, 'source' => $value['mailganer_list_id'] ] );
+
+                //throttling protection
+                sleep(1);
+
                 if ($res->count != 0) {
                     $debug_logger->debug("$email менеджера $this->manager уже в списке менеджера " . $value['nickname']);
 

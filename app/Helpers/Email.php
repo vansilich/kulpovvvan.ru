@@ -5,7 +5,7 @@ namespace App\Helpers;
 class Email
 {
 
-    public static string $regexp = '#(?:[a-z0-9_-]+\.)*[a-z0-9_-]*@(?:[a-z0-9\-]+\.)+[a-z]{2,6}#i';
+    public static string $regexp = '#(?:[a-z0-9_-]+\.)*[a-z0-9_-]+@(?:[a-z0-9\-]+\.)+[a-z]{2,6}#i';
 
     /**
      * Search emails in text

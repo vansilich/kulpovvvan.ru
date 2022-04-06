@@ -31,7 +31,7 @@ class SubjectsFromInbox implements ShouldQueue
 
     public function __construct(
         private string $managerAlias,
-    ) {
+    ){
         $this->managerMail = Manager::where('nickname', $this->managerAlias)->first()->toArray()['mail'];
 
         $this->pageTokenCacheKey = $this->managerAlias . '_SubjectsFromInbox_pageToken';

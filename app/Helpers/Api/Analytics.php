@@ -2,21 +2,35 @@
 
 namespace App\Helpers\Api;
 
+use Google\Service\AnalyticsReporting\MetricFilter;
+use Google\Service\AnalyticsReporting\MetricFilterClause;
 use Google_Client;
-use Google_Service_AnalyticsReporting_DateRange;
-use Google_Service_AnalyticsReporting_Dimension;
-use Google_Service_AnalyticsReporting_GetReportsRequest;
-use Google_Service_AnalyticsReporting_Metric;
-use Google_Service_AnalyticsReporting_ReportRequest;
-use Google_Service_AnalyticsReporting;
+use Google\Exception;
+use Google\Service\AnalyticsReporting;
+use Google\Service\AnalyticsReporting\DateRange;
+use Google\Service\AnalyticsReporting\Dimension;
+use Google\Service\AnalyticsReporting\GetReportsRequest;
+use Google\Service\AnalyticsReporting\Metric;
+use Google\Service\AnalyticsReporting\ReportRequest;
 
 class Analytics
 {
 
+    private string $view_id = '79933304';
+    private AnalyticsReporting $analyticsReporting;
+
     /**
-     * @throws \Google\Exception
+     * @throws Exception
      */
-    public static function authorization(): Google_Service_AnalyticsReporting
+    public function __construct()
+    {
+        $this->authorization();
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function authorization(): void
     {
         // здесь нужно указать имя JSON-файла, содержащего сгенерированный ключ
         $KEY_FILE_LOCATION =  base_path() . '/credentials/google/credentials.json';
@@ -26,73 +40,110 @@ class Analytics
         $client->setAuthConfig( $KEY_FILE_LOCATION );
         $client->setScopes(['https://www.googleapis.com/auth/analytics.readonly']);
 
-        return new Google_Service_AnalyticsReporting($client);
+        $this->analyticsReporting = new AnalyticsReporting($client);
     }
 
-    public static function getReport($analytics, $metric, $date_start, $date_end)
+    public function getReport( $metric, $date_start, $date_end )
     {
-        // здесь нужно указать значение своего VIEW_ID
-        $VIEW_ID = "79933304";
 
-        // создадим объект DateRange (диапазон дат)
-        $dateRange = new Google_Service_AnalyticsReporting_DateRange();
-        $dateRange->setStartDate($date_start);
-        $dateRange->setEndDate($date_end);
-
-        $metricsValue = $metric['metrics'];
-        $dimensionsValue = $metric['dimensions'];
-
+        /** @var Metric[] $metrics */
         $metrics = [];
-        foreach ($metricsValue as $name) {
+        foreach ($metric['metrics'] as $name) {
 
-            // создадим объект Metrics (показатели данных)
-            $metrica = new Google_Service_AnalyticsReporting_Metric();
-            // выражение показателя (в данном случае простое имя ga:pageviews – количество просмотров)
+            $metrica = new Metric();
             $metrica->setExpression("ga:" . $name);
-            // задаём альтернативное название для выражения показателя
             $metrica->setAlias($name);
-
             $metrics[] = $metrica;
         }
 
+        /** @var Dimension[] $dimensions */
         $dimensions = [];
-        if ($dimensionsValue) {
+        if ( isset($metric['dimensions']) ) {
 
-            foreach ($dimensionsValue as $name) {
-                // создадим объект Dimensions (параметры данных в запросе)
-                $dimension = new Google_Service_AnalyticsReporting_Dimension();
-
-                // название параметра, по которому подбираются данные (в данном случае адрес страницы)
+            foreach ($metric['dimensions'] as $name) {
+                $dimension = new Dimension();
                 $dimension->setName( 'ga:'.$name );
                 $dimensions[] = $dimension;
             }
-
         }
 
-        // создадим объект ReportRequest (запрос)
-        $request = new Google_Service_AnalyticsReporting_ReportRequest();
+        /** @var MetricFilterClause[] $metricFilterClauses */
+        $metricFilterClauses = [];
+        if ( isset($metric['metricFilterClauses']) ) {
 
-        // добавим к запросу идентификатор viewId
-        $request->setViewId( $VIEW_ID );
+            $filterClauses = new MetricFilterClause();
+            foreach ($metric['metricFilterClauses'] as $filterClause){
+
+                $filter = new MetricFilter;
+                $filter->setMetricName($filterClause["metricName"]);
+                $filter->setOperator("operator");
+                $filter->setComparisonValue("comparisonValue");
+
+                if ( isset($filterClause['not']) ) {
+                    $filter->setNot($filterClause['not']);
+                }
+
+                $filterClauses->setFilters($filter);
+            }
+
+            $metricFilterClauses[] = $filterClauses;
+        }
+
+        $request = $this->initAnalyticsReportingRequest(
+            $this->initDateRanges($date_start, $date_end),
+            $metrics,
+            $dimensions,
+            $metricFilterClauses,
+        );
+
+        // создадим объект GetReportsRequest
+        $body = new GetReportsRequest();
+        $body->setReportRequests([ $request ]);
+        return $this->analyticsReporting->reports->batchGet($body);
+    }
+
+    private function initDateRanges( string $date_start, string $date_end ): DateRange
+    {
+        $dateRange = new DateRange();
+        $dateRange->setStartDate($date_start);
+        $dateRange->setEndDate($date_end);
+
+        return $dateRange;
+    }
+
+    /**
+     * @param DateRange $dateRange
+     * @param Metric[] $metrics
+     * @param Dimension[] $dimensions
+     * @param MetricFilterClause[] $metricFilters
+     *
+     * @return ReportRequest
+     */
+    private function initAnalyticsReportingRequest(DateRange $dateRange, array $metrics = [], array $dimensions = [], array $metricFilters = []): ReportRequest
+    {
+
+        $request = new ReportRequest();
+
+        $request->setViewId( $this->view_id );
 
         // добавим к запросу максимальное количество строк, которое хотим получить
         $request->setPageSize("1000000000");
 
-        // добавим к запросу диапазон дат
         $request->setDateRanges( $dateRange );
 
-        // добавим к запросу метрики
-        $request->setMetrics( $metrics );
+        if ( !empty($metrics) ){
+            $request->setMetrics( $metrics );
+        }
 
-        // добавим к запросу параметры
-        if ($dimensionsValue)
+        if ( !empty($dimensions) ) {
             $request->setDimensions( $dimensions );
+        }
 
-        // создадим объект GetReportsRequest
-        $body = new Google_Service_AnalyticsReporting_GetReportsRequest();
-        $body->setReportRequests(array($request));
-        return $analytics->reports->batchGet($body);
+        if ( !empty($metricFilters) ) {
+            $request->setMetricFilterClauses($metricFilters);
+        }
 
+        return $request;
     }
 
 }

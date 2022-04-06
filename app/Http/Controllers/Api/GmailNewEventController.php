@@ -6,7 +6,6 @@ use App\Helpers\Api\Gmail;
 use App\Http\Controllers\Controller;
 use Exception;
 use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\RequestOptions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
