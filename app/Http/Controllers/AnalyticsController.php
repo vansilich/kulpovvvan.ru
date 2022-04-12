@@ -30,17 +30,17 @@ class AnalyticsController extends Controller
 
         //идентификатор цели 8 - id 89864822, идентификатор цели 11 - id 89814803
         $analyticsRequest = [
-            'metrics' => ['goal11ConversionRate', 'adCost/ga:goal11Completions', 'goal8ConversionRate', 'adCost/ga:goal8Completions', 'CTR', 'adClicks', 'impressions'],
-            'dimensions' => ['adwordsCreativeID', 'campaign', 'adGroup', 'adwordsAdGroupID', 'date'],
+            'metrics' => ['ga:goal11ConversionRate', 'ga:adCost/ga:goal11Completions', 'ga:goal8ConversionRate', 'ga:adCost/ga:goal8Completions', 'ga:CTR', 'ga:adClicks', 'ga:impressions'],
+            'dimensions' => ['ga:adwordsCreativeID', 'ga:campaign', 'ga:adGroup', 'ga:adwordsAdGroupID', 'ga:date'],
         ];
 
         $file_name = Carbon::now()->timestamp.'.csv';
         $csv = new Csv( storage_path("app/public/$file_name") );
         $csv->openStream();
 
-        $csv->insertRow([$headers]);
+        $csv->insertRow($headers);
 
-        $response = $analyticsReporting->getReport( $analyticsRequest, $request->get('dateStart'), $request->get('dateEnd') );
+        $response = $analyticsReporting->customReport( $analyticsRequest, $request->get('dateStart'), $request->get('dateEnd') );
 
         $rows = $response[0]->getData()->getRows();
         for ($rowIndex = 0; $rowIndex < count($rows); $rowIndex++) {

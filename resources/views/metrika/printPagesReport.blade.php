@@ -2,7 +2,9 @@
 
 @section('content')
 
-    <h4>Загружены даннные для отчета в период <b>{{ $from }} - {{ $to }}</b> (включительно)</h4>
+    @if($from !== null && $to !== null)
+        <h4>Загружены даннные для отчета в период <b>{{ $from }} - {{ $to }}</b> (включительно)</h4>
+    @endif
 
     <form action="{{ route('metricaPrintPagesReportHandle') }}" method="POST" class="w-50">
         @csrf

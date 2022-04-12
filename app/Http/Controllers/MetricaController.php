@@ -25,8 +25,13 @@ class MetricaController extends Controller
 
     public function printPagesReportForm(): View
     {
-        $to = UrlViewsReport::select('day')->distinct()->orderBy('day', 'asc')->get()->last()->day;
-        $from = Cache::get('FNUV_lastFetchedDate');
+        $to = UrlViewsReport::select('day')->distinct()->orderBy('day', 'asc')->get()->last();
+        $from = null;
+
+        if ($to) {
+            $to = $to->day;
+            $from = Cache::get('FNUV_lastFetchedDate');
+        }
 
         return view('metrika.printPagesReport')->with('from', $from)->with('to', $to);
     }

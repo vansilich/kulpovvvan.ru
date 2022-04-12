@@ -5,6 +5,7 @@ namespace App\Helpers\Api;
 use App\Helpers\Email;
 use Exception;
 use Generator;
+use Google\Service\Exception as GoogleException;
 use Google\Service\Gmail\ListHistoryResponse;
 use Google\Service\Gmail\Message;
 use Google\Service\Gmail\MessagePartHeader;
@@ -70,12 +71,16 @@ class Gmail
                 $text .= $this->getEmailText($part);
             }
 
+            $fileNames = [];
+            $this->getEmailAttachmentsNames($payload, $fileNames);
+
             yield [
                 'subject' => $subject,
                 'from' => $from,
                 'to' => $to,
                 'text' => $text,
-                'timestamp' => $timestamp
+                'timestamp' => $timestamp,
+                'attachmentsNames' => $fileNames
             ];
         }
     }
@@ -113,10 +118,17 @@ class Gmail
         return $this->service->users_history->listUsersHistory('me', $params);
     }
 
-    public function messageById( string $id, array $opt_params = [] ): Message
+    public function messageById( string $id, array $opt_params = [] ): Message|false
     {
         $params = array_merge( ['format' => 'full'], $opt_params);
-        return $this->service->users_messages->get( 'me', $id, $params);
+        try {
+            $message = $this->service->users_messages->get( 'me', $id, $params);
+        } catch (GoogleException $exception) {
+            //message not found
+            return false;
+        }
+
+        return $message;
     }
 
     /**
@@ -179,7 +191,7 @@ class Gmail
     /**
      * Retrieve 'text/plain' part from message
      */
-    public function getEmailText( MessagePart $messagePart ): string|bool
+    private function getEmailText( MessagePart $messagePart ): string|bool
     {
 
         // 'text/html' for more correct parsing. 'text/plain' parts sometimes incorrectly imploding words
@@ -199,6 +211,21 @@ class Gmail
         }
 
         return decodeGmailBody( $messagePart['body']->data );
+    }
+
+    private function getEmailAttachmentsNames(MessagePart $messagePart, array &$fileNames): void
+    {
+
+        if ( isset($messagePart->parts) ) {
+            foreach ($messagePart->getParts() as $part) {
+
+                $this->getEmailAttachmentsNames( $part, $fileNames );
+            }
+        }
+
+        if ($messagePart->filename !== '') {
+            $fileNames[] = $messagePart->filename;
+        }
     }
 
     /**

@@ -134,11 +134,11 @@ class YDirect
                         [
                             "Field" => "AdId",
                             "Operator" => "IN",
-                            "Values" => $adIds
+                            "Values" => array_values($adIds)
                         ]
                     ]
                 ],
-                "FieldNames" => ["AdId", "Ctr", "Impressions", "Clicks", "Cost", "Date"],
+                "FieldNames" => ["AdId", "Date", "Ctr", "Impressions", "Clicks", "Cost"],
                 "ReportName" => $report_name,
                 "ReportType" => "AD_PERFORMANCE_REPORT",
                 "DateRangeType" => "CUSTOM_DATE",
@@ -147,10 +147,16 @@ class YDirect
             ]
         ];
 
-        $data = $this->getData( $params)->getBody()->getContents();
+
+        $data = $this->getData( $params )->getBody()->getContents();
         $result = [];
         foreach ((new Tsv())->stringTsvToArrayIterator($data) as $row){
-            $result[$row[0]][] = $row;
+            $item = [];
+            foreach ($params['params']['FieldNames'] as $key => $fieldName){
+                $item[ $fieldName ] = $row[ $key ];
+            }
+
+            $result[ $item['AdId'] ][] = $item;
         }
         return $result;
     }

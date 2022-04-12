@@ -6,6 +6,7 @@ use App\Helpers\Api\Gmail;
 use App\Http\Controllers\Controller;
 use Exception;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\RequestOptions;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ class GmailNewEventController extends Controller
     private string $appScriptForwardURL = 'https://script.google.com/macros/s/AKfycbxhEkN5cynANGWzp2Gy1m3UP49YQVOaYaKjbe-23xX33fb5EkWR-EMQODIlTv8us_QF/exec';
     private string $managerAlias = 'mail';
     private LoggerInterface $logger;
+    private string $redirectMail = 'fluida-roistat@yandex.ru';
 
     public function __construct()
     {
@@ -67,6 +69,10 @@ class GmailNewEventController extends Controller
                 Cache::put('lastGmailHandledNewMessageId', $messageId);
 
                 $message = $gmailAPI->messageById( $messageId );
+                if (!$message) {
+                    //message not found
+                    return response()->json();
+                }
 
                 $payload = $message->getPayload();
                 $headers = $payload->getHeaders();
@@ -77,10 +83,7 @@ class GmailNewEventController extends Controller
                     continue;
                 }
 
-                preg_match('#mail(\d+)[a-z]+@fluid-line\.ru#', $to, $digitsInEmail);
-                $digitsEmail =  'mail' . $digitsInEmail[1] . '@fluid-line.ru';
-
-                preg_match('#mail(?:\d+)([a-z]+)@fluid-line\.ru#', $to, $endingLetters);
+                preg_match('#(?:\d+)([a-z]+)@fluid-line\.ru#', $to, $endingLetters);
 
                 $client = new Client();
                 try {
@@ -89,7 +92,7 @@ class GmailNewEventController extends Controller
                         ->insert('INSERT INTO roistat_emails (`gmail_id`, `to_address`, `date`) VALUES (?, ?, ?)',
                             [$messageId, $endingLetters[1], now()->toDateString()]);
 
-                    $client->post($this->appScriptForwardURL, [ RequestOptions::JSON => ["messageId" => $messageId, "To" => $digitsEmail] ]);
+                    $client->post($this->appScriptForwardURL, [ RequestOptions::JSON => ["messageId" => $messageId, "To" => $this->redirectMail] ]);
                 } catch ( Throwable $exception) {
                     $this->logger->error( $exception->getMessage() );
                 }

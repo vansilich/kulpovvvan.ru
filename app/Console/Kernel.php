@@ -17,8 +17,10 @@ class Kernel extends ConsoleKernel
     {
 //        $schedule->command('url-reports:fetch-new')->daily();
 
-        $schedule->command('queue:work --stop-when-empty');
         $schedule->command('queue:retry all')->everyFifteenMinutes();
+        $schedule->command('queue:work --stop-when-empty');
+        $schedule->command('queue:work --queue=mailganer --stop-when-empty');
+        $schedule->command('queue:work --queue=gmail-fluid --stop-when-empty');
     }
 
     /**

@@ -7,7 +7,7 @@ use ReflectionException;
 
 class PushJobToTheQueue extends Command
 {
-    protected $signature = 'job:push {--sync} {jobClassName} {jobArguments*}';
+    protected $signature = 'job:push {--sync} {--queue=default} {jobClassName} {jobArguments*}';
 
     protected $description = 'Push selected job in jobs table for execution after 1 second';
 
@@ -37,7 +37,7 @@ class PushJobToTheQueue extends Command
 
         if ( !$this->option('sync') ) {
             $job = forward_static_call_array([$jobClassName, "dispatch"], $jobConstructorArgs);
-            $job->delay( now()->addSecond() );
+            $job->delay( now()->addSecond() )->onQueue( $this->option('queue') );
 
             echo "Job pushed to the jobs table\n";
             return 0;
