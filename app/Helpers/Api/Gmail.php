@@ -191,7 +191,7 @@ class Gmail
     /**
      * Retrieve 'text/plain' part from message
      */
-    private function getEmailText( MessagePart $messagePart ): string|bool
+    public function getEmailText( MessagePart $messagePart ): string|bool
     {
 
         // 'text/html' for more correct parsing. 'text/plain' parts sometimes incorrectly imploding words

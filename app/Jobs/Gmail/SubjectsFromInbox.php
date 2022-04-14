@@ -7,6 +7,7 @@ use App\Helpers\Csv;
 use App\Helpers\Email;
 use App\Helpers\Phone;
 use App\Models\Manager;
+use Carbon\Carbon;
 use Exception;
 use Google\Service\Gmail\ListMessagesResponse;
 use Illuminate\Bus\Queueable;
@@ -55,7 +56,7 @@ class SubjectsFromInbox implements ShouldQueue
 
         //setup headers in file
         if ( !$file_exists ) {
-            $csv->insertRow(['trigger', 'subject', 'email', 'from', 'to', 'emails', 'phones']);
+            $csv->insertRow(['trigger', 'subject', 'email', 'from', 'to', 'emails', 'phones', 'date']);
         }
 
         $this->messagesListIterator( $csv, $cache );
@@ -86,10 +87,10 @@ class SubjectsFromInbox implements ShouldQueue
 
             foreach ( $this->gmailAPI->messagesTextIterator( $this->messagesList ) as $email_data ) {
 
-                $externalEmail = preg_match( '#'.preg_quote($this->managerMail).'#u', $email_data['from'])
+                $clientEmail = preg_match( '#'.preg_quote($this->managerMail).'#u', $email_data['from'])
                     ? $email_data['to']
                     : $email_data['from'];
-                $email = Email::searchByRegexp( $externalEmail );
+                $email = Email::searchByRegexp( $clientEmail );
 
                 if ( empty($email[0]) ) {
                     continue;
@@ -97,6 +98,7 @@ class SubjectsFromInbox implements ShouldQueue
 
                 $email = mb_strtolower($email[0][0], 'UTF-8');
 
+                $dateTime = Carbon::createFromTimestampMs($email_data['timestamp'])->toDateTimeString();
                 $phones = $this->phonesToUniqueArray( $email_data['text'] );
                 $emails = $this->emailsToUniqueArray( $email_data['text'] );
                 $trigger = $this->matchTriggerInSubject( $email_data['subject'] );
@@ -109,6 +111,7 @@ class SubjectsFromInbox implements ShouldQueue
                     $email_data['to'],
                     $emails ? implode("\n", $emails) : null,
                     $phones ? implode("\n", $phones) : null,
+                    $dateTime
                 ]);
 
                 $this->cacheRemainingMessagesList( $cache );

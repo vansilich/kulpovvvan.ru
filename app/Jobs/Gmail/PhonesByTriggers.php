@@ -93,22 +93,24 @@ class PhonesByTriggers implements ShouldQueue
 
                 foreach ( $this->gmailAPI->messagesTextIterator( $this->messagesList ) as $email_data) {
 
-                    list('subject' => $subject, 'from' => $from, 'to' => $to, 'text' => $text) = $email_data;
-
-                    $externalEmail = preg_match( '#'.preg_quote($this->managerMail).'#u', $from) ? $to : $from;
+                    $externalEmail = preg_match( '#'.preg_quote($this->managerMail).'#u', $email_data['from'])
+                        ? $email_data['to']
+                        : $email_data['from'];
                     $email = Email::searchByRegexp( $externalEmail );
 
                     if ( empty($email[0]) ) continue;
 
+                    $dateTime = Carbon::createFromTimestampMs($email_data['timestamp'])->toDateTimeString();
                     $email = mb_strtolower($email[0][0], 'UTF-8');
-                    $phones = Phone::searchByRegexp( $text );
-                    $emails = Email::searchByRegexp( $text );
+                    $phones = Phone::searchByRegexp( $email_data['text'] );
+                    $emails = Email::searchByRegexp( $email_data['text'] );
 
                     $parsed_data[ $trigger ][ $email ][] = [
-                        'from' => $from,
-                        'to' => $to,
+                        'from' => $email_data['from'],
+                        'to' => $email_data['to'],
                         'emails' => $emails[0] ? array_unique($emails[0]) : null,
-                        'phones' => $phones[0] ? array_unique($phones[0]) : null
+                        'phones' => $phones[0] ? array_unique($phones[0]) : null,
+                        'date' => $dateTime
                     ];
 
                     $this->cacheRemainingMessagesList();
@@ -140,6 +142,7 @@ class PhonesByTriggers implements ShouldQueue
                         $value['to'],
                         $value['emails'] ? implode("\n", $value['emails']) : null,
                         $value['phones'] ? implode("\n", $value['phones']) : null,
+                        $value['date']
                     ]);
                 }
             }
@@ -156,7 +159,7 @@ class PhonesByTriggers implements ShouldQueue
 
         //setup headers in file
         if ( !$file_exists ) {
-            $csv->insertRow(['trigger', 'email', 'from', 'to', 'emails', 'phones']);
+            $csv->insertRow(['trigger', 'email', 'from', 'to', 'emails', 'phones', 'date']);
         }
 
         return $csv;

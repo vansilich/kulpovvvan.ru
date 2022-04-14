@@ -1,16 +1,12 @@
 <?php
 
-namespace App\Handlers\Dashboard;
+namespace App\Helpers\Api;
 
 use Exception;
 use Illuminate\Support\Facades\DB;
 
 class OneC
 {
-
-    public function __construct(
-        private DB $DB
-    ){}
 
     /**
      * Fetching all calls data by provided interval from 1C upload table 'PhoneOrder'.
@@ -20,7 +16,7 @@ class OneC
      */
     public function phoneOrders( string $startDate, string $endDate ): array
     {
-        $phoneOrders = $this->DB::connection('gb_testfl')
+        $phoneOrders = DB::connection('gb_testfl')
             ->table('PhoneOrder')
             ->where('call_date', '>=', $startDate)
             ->where('call_date', '<=', $endDate)
@@ -43,21 +39,28 @@ class OneC
      */
     public function getInvoiceInfo( array $invoicesIds ): array
     {
-        $invoices = $this->DB::connection('gb_testfl')
+        $invoices = DB::connection('gb_testfl')
             ->table('pdf_uploads')
             ->whereIn('order_id', $invoicesIds)
             ->get();
 
-        $result = [];
+        //setup headers
+        $result = [ ['generated', 'order_amount', 'paid_amount', 'is_paid', 'paid_date'] ];
         foreach ($invoices->getIterator() as $invoice) {
 
             $invoice_body = [];
+            $invoice_body['order_id'] = $invoice->order_id;
             $invoice_body['generated'] = $invoice->generated;
-
+            $invoice_body['order_amount'] = $invoice->order_amount;
+            $invoice_body['paid_amount'] = $invoice->paid_amount;
             //invoice is fully paid
-            if ($invoice->paid_percent === '100%') {
-                $invoice_body['paid_date'] = $invoice->paid_date;
-            }
+            $invoice_body['is_paid'] =
+                $invoice->order_amount !== ''
+                && $invoice->order_amount === $invoice->paid_amount;
+            //save date, if fully paid
+            $invoice_body['paid_date'] = $invoice_body['is_paid']
+                ? $invoice->paid_date
+                : false;
 
             $result[] = $invoice_body;
         }

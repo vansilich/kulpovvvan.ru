@@ -48,6 +48,9 @@ class PhonesByTopDomains implements ShouldQueue, ShouldBeUnique
         $this->gmail_api->setupService();
 
         $this->messagesListIterator();
+
+        //Удаляем кеш файл
+        Storage::disk('local')->delete('public/jobs/Gmail/PhonesByTopDomains/cache/' . $this->managerAlias);
     }
 
     /**
@@ -108,9 +111,6 @@ class PhonesByTopDomains implements ShouldQueue, ShouldBeUnique
         }
 
         $csv->closeStream();
-
-        //Удаляем кеш файл
-        Storage::disk('local')->delete('public/jobs/Gmail/PhonesByTopDomains/cache/' . $this->managerAlias);
     }
 
     /**

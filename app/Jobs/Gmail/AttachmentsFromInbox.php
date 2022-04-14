@@ -7,6 +7,7 @@ use App\Helpers\Csv;
 use App\Helpers\Email;
 use App\Helpers\Phone;
 use App\Models\Manager;
+use Carbon\Carbon;
 use Exception;
 use Google\Service\Gmail\ListMessagesResponse;
 use Illuminate\Bus\Queueable;
@@ -47,6 +48,14 @@ class AttachmentsFromInbox implements ShouldQueue
         $this->gmailAPI->setClient( $this->managerAlias );
         $this->gmailAPI->setupService();
 
+        $message = $this->gmailAPI->messageById('1801d4f92e00fd9c');
+        $text = '';
+        foreach ( $message->getPayload()->getParts() as $part ) {
+            $text .= $this->gmailAPI->getEmailText($part);
+        }
+        dd($this->emailsToUniqueArray($text));
+
+
         $name = sprintf("%s.csv", $this->managerAlias);
         $csv = new Csv( storage_path("app/public/jobs/Gmail/AttachmentsFromInbox/$name") );
         $file_exists = file_exists( $csv->filePath );
@@ -55,7 +64,7 @@ class AttachmentsFromInbox implements ShouldQueue
 
         //setup headers in file
         if ( !$file_exists ) {
-            $csv->insertRow(['trigger', 'subject', 'email', 'from', 'to', 'emails', 'phones', 'attachments']);
+            $csv->insertRow(['trigger', 'subject', 'email', 'from', 'to', 'emails', 'phones', 'attachments', 'date']);
         }
 
         $this->messagesListIterator( $csv, $cache );
@@ -86,10 +95,10 @@ class AttachmentsFromInbox implements ShouldQueue
 
             foreach ( $this->gmailAPI->messagesTextIterator( $this->messagesList ) as $email_data ) {
 
-                $externalEmail = preg_match( '#'.preg_quote($this->managerMail).'#u', $email_data['from'])
+                $clientEmail = preg_match( '#'.preg_quote($this->managerMail).'#u', $email_data['from'])
                     ? $email_data['to']
                     : $email_data['from'];
-                $email = Email::searchByRegexp( $externalEmail );
+                $email = Email::searchByRegexp( $clientEmail );
 
                 if ( empty($email[0]) ) {
                     continue;
@@ -97,6 +106,7 @@ class AttachmentsFromInbox implements ShouldQueue
 
                 $email = mb_strtolower($email[0][0], 'UTF-8');
 
+                $dateTime = Carbon::createFromTimestampMs($email_data['timestamp'])->toDateTimeString();
                 $phones = $this->phonesToUniqueArray( $email_data['text'] );
                 $emails = $this->emailsToUniqueArray( $email_data['text'] );
                 $trigger = $this->matchTriggerInSubject( $email_data['subject'] );
@@ -109,7 +119,8 @@ class AttachmentsFromInbox implements ShouldQueue
                     $email_data['to'],
                     $emails ? implode("\n", $emails) : null,
                     $phones ? implode("\n", $phones) : null,
-                    !empty($email_data['attachmentsNames']) ? implode("\n", $email_data['attachmentsNames']) : null
+                    !empty($email_data['attachmentsNames']) ? implode("\n", $email_data['attachmentsNames']) : null,
+                    $dateTime
                 ]);
 
                 $this->cacheRemainingMessagesList( $cache );

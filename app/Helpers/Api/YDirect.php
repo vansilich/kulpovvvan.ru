@@ -15,10 +15,10 @@ class YDirect
 
     private string $apiEndpoint = 'https://api.direct.yandex.com/json/v5/reports';
 
-    public int $status_ok = 200;     //Возвращается вместе с переданными данными
-    public int $status_created = 201;    //Если отчет поставлен в очередь
-    public int $status_accepted = 202;    //Если еще в очереди
-    public int $status_bad = 400;    //Если параметры некорректны
+    public int $status_ok = 200;            //Возвращается вместе с переданными данными
+    public int $status_created = 201;       //Если отчет поставлен в очередь
+    public int $status_accepted = 202;      //Если еще в очереди
+    public int $status_bad = 400;           //Если параметры некорректны
 
     private Client $authHttpClient;
 
@@ -121,7 +121,7 @@ class YDirect
      *
      * @throws GuzzleException
      */
-    public function adsReport(string $startDate, string $endDate, array $adIds ): array
+    public function adsReportGroupByDay(string $startDate, string $endDate, array $adIds ): array
     {
         $report_name = $this->generateReportName();
 
@@ -138,7 +138,7 @@ class YDirect
                         ]
                     ]
                 ],
-                "FieldNames" => ["AdId", "Date", "Ctr", "Impressions", "Clicks", "Cost"],
+                "FieldNames" => ["AdId", "CampaignId", "Date", "Ctr", "Impressions", "Clicks", "Cost"],
                 "ReportName" => $report_name,
                 "ReportType" => "AD_PERFORMANCE_REPORT",
                 "DateRangeType" => "CUSTOM_DATE",
@@ -156,7 +156,7 @@ class YDirect
                 $item[ $fieldName ] = $row[ $key ];
             }
 
-            $result[ $item['AdId'] ][] = $item;
+            $result[] = $item;
         }
         return $result;
     }

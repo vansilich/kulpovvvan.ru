@@ -72,12 +72,12 @@ class Analytics
     /**
      * @throws \Google\Service\Exception
      */
-    public function adsReport(string $date_start, string $date_end, array $adsIds = []): array
+    public function adsReportGroupByDay(string $date_start, string $date_end, array $adsIds = []): array
     {
         $metricsNames = [ 'ga:CTR', 'ga:impressions', 'ga:adClicks', 'ga:adCost' ];
         $metrics = $this->initMetrics( $metricsNames );
 
-        $dimensionsNames = ['ga:adwordsCreativeID', 'ga:date'];
+        $dimensionsNames = ['ga:adwordsCreativeID', 'ga:adwordsCampaignID', 'ga:date'];
         $dimensions = $this->initDimensions( $dimensionsNames );
 
         $dimensionFilterClauses = !empty($adsIds)
@@ -100,28 +100,7 @@ class Analytics
         $response = $this->analyticsReporting->reports->batchGet($body);
         $responseRows = $response[0]->getData()->getRows();
 
-        $result = [];
-        for ($rowIndex = 0; $rowIndex < count($responseRows); $rowIndex++){
-
-            /** @var ReportRow $row */
-            $row = $responseRows[$rowIndex];
-            $item = [];
-
-            foreach ($row->getDimensions() as $key => $dimension){
-                if ( $dimensionsNames[$key] === 'ga:date' ){
-                    $dimension = Carbon::createFromFormat('Ymd', $dimension)->format('Y.m.d');
-                }
-                $item[ $dimensionsNames[$key] ] = $dimension;
-            }
-
-            foreach ($row->getMetrics()[0]->getValues() as $key => $metric) {
-                $item[ $metricsNames[$key] ] = $metric;
-            }
-
-            $result[ $item['ga:adwordsCreativeID'] ][] = $item;
-        }
-
-        return $result;
+        return $this->responseRowsToArr($responseRows, $dimensionsNames, $metricsNames);
     }
 
     private function initDateRanges( string $date_start, string $date_end ): DateRange
@@ -265,6 +244,36 @@ class Analytics
         }
 
         return $request_metrics;
+    }
+
+    /**
+     * @param ReportRow[] $rows
+     * @param string[] $dimensionsNames
+     * @param string[] $metricsNames
+     */
+    private function responseRowsToArr( array $rows, array $dimensionsNames, array $metricsNames ): array
+    {
+        $result = [];
+        for ($rowIndex = 0; $rowIndex < count($rows); $rowIndex++){
+
+            $row = $rows[$rowIndex];
+            $item = [];
+
+            foreach ($row->getDimensions() as $key => $dimension){
+                if ( $dimensionsNames[$key] === 'ga:date' ){
+                    $dimension = Carbon::createFromFormat('Ymd', $dimension)->format('Y.m.d');
+                }
+                $item[ $dimensionsNames[$key] ] = $dimension;
+            }
+
+            foreach ($row->getMetrics()[0]->getValues() as $key => $metric) {
+                $item[ $metricsNames[$key] ] = $metric;
+            }
+
+            $result[] = $item;
+        }
+
+        return $result;
     }
 
 }
