@@ -2,6 +2,7 @@
 
 namespace App\Helpers\Api;
 
+use Exception;
 use Google\Cloud\BigQuery\BigQueryClient;
 use Google\Cloud\BigQuery\Dataset;
 use Google\Cloud\Core\ExponentialBackoff;
@@ -29,15 +30,15 @@ class BigQuery
     }
 
     /**
-     * @throws \Exception
+     * @throws Exception
      */
-    public function getYM_UidByRoistat_Id( $CLIENT_NAME )
+    public function getYM_UidByRoistat_Id( $CLIENT_NAME ): array
     {
         $sql = "SELECT DISTINCT YM_UID FROM `peak-age-279206.googleDataStuidio.FL-visitors` WHERE CLIENT_NAME IN (" . $CLIENT_NAME . ")";
         return $this->getQueryResults($sql);
     }
 
-    public function getQueryResults( string $query )
+    public function getQueryResults( string $query ): array
     {
         $options = [
             "configuration" => [

@@ -48,14 +48,6 @@ class AttachmentsFromInbox implements ShouldQueue
         $this->gmailAPI->setClient( $this->managerAlias );
         $this->gmailAPI->setupService();
 
-        $message = $this->gmailAPI->messageById('1801d4f92e00fd9c');
-        $text = '';
-        foreach ( $message->getPayload()->getParts() as $part ) {
-            $text .= $this->gmailAPI->getEmailText($part);
-        }
-        dd($this->emailsToUniqueArray($text));
-
-
         $name = sprintf("%s.csv", $this->managerAlias);
         $csv = new Csv( storage_path("app/public/jobs/Gmail/AttachmentsFromInbox/$name") );
         $file_exists = file_exists( $csv->filePath );
