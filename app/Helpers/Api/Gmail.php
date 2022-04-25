@@ -85,34 +85,6 @@ class Gmail
         }
     }
 
-//    public function forwardMessage( Message $message, string $toAddress )
-//    {
-//        $raw = $this->messageById( $message->getId(), ['format' => 'raw'] );
-//        $decodedRaw = decodeGmailBody($raw->raw);
-//
-//        $payload = $message->getPayload();
-//        $oldHeaders = $payload->getHeaders();
-//
-//        $newHeaders[] = $this->createHeader( 'To', $toAddress );
-//        $newHeaders[] = $this->createHeader( 'MIME-Version', '1.0' );
-//        $newHeaders[] = $this->createHeader( 'From', $this->getHeader($oldHeaders, 'From') );
-//        $newHeaders[] = $this->createHeader( 'Date', $this->getHeader($oldHeaders, 'Date') );
-//
-//        $oldSubject = $this->getHeader($oldHeaders, 'Subject');
-//        $newHeaders[] = $this->createHeader( 'Subject', iconv_mime_encode( 'Subject', $oldSubject, ['input-charset' => 'UTF-8', 'output-charset' => 'UTF-8']) );
-//
-//        $newHeaders[] = $this->createHeader( 'Content-Type', $this->getHeader($oldHeaders, 'Content-Type') );
-//
-//        $newRawMessage = $this->replaceHeadersInRaw($decodedRaw, $newHeaders);
-//
-//        $newMessage = new Message();
-//        $payload->setHeaders( $newHeaders );
-//        $newMessage->setPayload( $payload );
-//
-//        $newMessage->setRaw( $newRawMessage );
-//        $this->service->users_messages->send( 'me', $newMessage);
-//    }
-
     public function historyList( array $params ): ListHistoryResponse
     {
         return $this->service->users_history->listUsersHistory('me', $params);
@@ -275,30 +247,5 @@ class Gmail
 
         $this->client = $client;
     }
-
-    /**
-     * @param string $rawMessage
-     * @param MessagePartHeader[] $newHeaders
-     * @return string
-     */
-//    public function replaceHeadersInRaw( string $rawMessage, array $newHeaders ): string
-//    {
-//        /*
-//         * Parts in $rawMessage separated by empty lines and so 1 part is always Mail headers,
-//         * as it is described in RFC-822
-//         */
-//        $explodedMessage = explode("\r\n\r\n", $rawMessage);
-//        $rawHeaders = '';
-//        foreach ( $newHeaders as $header ) {
-//            $rawHeaders .= sprintf("%s: %s;\r\n", $header->name, $header->value);
-//        }
-//        $explodedMessage[0] = $rawHeaders;
-//
-//        $raw = implode("\r\n", $explodedMessage);
-//
-//        dd($raw);
-//
-//        return strtr( base64_encode($raw), '-_', '+/' );
-//    }
 
 }

@@ -79,18 +79,19 @@ class GmailNewEventController extends Controller
 
                 $to = $gmailAPI->getToAddress($headers);
 
-                if ( !preg_match('#mail(?:\d+)[a-z]+@fluid-line\.ru#', $to) ){
+                if ( !preg_match('#^\d+@fluid-line\.ru#', $to) ){
                     continue;
                 }
+                $this->logger->debug("Passed 'to' address: " . $to );
 
-                preg_match('#(?:\d+)([a-z]+)@fluid-line\.ru#', $to, $endingLetters);
+                preg_match('#(\d+)@fluid-line\.ru#', $to, $matches);
 
                 $client = new Client();
                 try {
 
                     DB::connection('gb_testfl')
                         ->insert('INSERT INTO roistat_emails (`gmail_id`, `to_address`, `date`) VALUES (?, ?, ?)',
-                            [$messageId, $endingLetters[1], now()->toDateString()]);
+                            [$messageId, $matches[1], now()->toDateString()]);
 
                     $client->post($this->appScriptForwardURL, [ RequestOptions::JSON => ["messageId" => $messageId, "To" => $this->redirectMail] ]);
                 } catch ( Throwable $exception) {

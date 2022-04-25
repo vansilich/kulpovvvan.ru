@@ -17,7 +17,7 @@ class Email
     {
         preg_match_all( static::$regexp, $text, $emails );
 
-        if ( empty($emails) ) {
+        if ( empty($emails[0]) ) {
             return false;
         }
         return $emails;
