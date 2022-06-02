@@ -15,6 +15,7 @@ class Mailganer
 
     public function unsubscribe($email): bool
     {
+        $email = mb_strtolower($email);
         $api_key = config('services.mailganer.key');
         $sources = config('services.mailganer.sources');
 

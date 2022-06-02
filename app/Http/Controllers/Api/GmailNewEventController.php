@@ -19,14 +19,13 @@ use Throwable;
 class GmailNewEventController extends Controller
 {
 
-    private string $appScriptForwardURL = 'https://script.google.com/macros/s/AKfycbxhEkN5cynANGWzp2Gy1m3UP49YQVOaYaKjbe-23xX33fb5EkWR-EMQODIlTv8us_QF/exec';
+    private string $appScriptForwardURL = 'https://script.google.com/macros/s/AKfycbzvI12YWp8Fp7gxvU7Ckb1MJJcEK4QRpy_aqqVC-lxe12g0ewLuSD563sq1BgA4UPij/exec';
     private string $managerAlias = 'mail';
     private LoggerInterface $logger;
-    private string $redirectMail = 'fluida-roistat@yandex.ru';
 
     public function __construct()
     {
-        $this->logger = Log::build(['driver' => 'single', 'path' => storage_path('logs/debug.log')]);
+        $this->logger = Log::build(['driver' => 'single', 'path' => storage_path('logs/controllers/GmailNewEventController/debug.log')]);
     }
 
     /**
@@ -79,21 +78,24 @@ class GmailNewEventController extends Controller
 
                 $to = $gmailAPI->getToAddress($headers);
 
-                if ( !preg_match('#^\d+@fluid-line\.ru#', $to) ){
+                if ( !preg_match('#^\d+[a-z]+@fluid-line\.ru#', $to) ){
                     continue;
                 }
-                $this->logger->debug("Passed 'to' address: " . $to );
+                $this->logger->debug("Валидный 'to' адрес: " . $to );
 
-                preg_match('#(\d+)@fluid-line\.ru#', $to, $matches);
+                preg_match('#^(\d+)([a-z]+)@fluid-line\.ru#', $to, $matches);
+                $roistat_email = $matches[1] . '@fluid-line.ru';
 
                 $client = new Client();
                 try {
 
                     DB::connection('gb_testfl')
                         ->insert('INSERT INTO roistat_emails (`gmail_id`, `to_address`, `date`) VALUES (?, ?, ?)',
-                            [$messageId, $matches[1], now()->toDateString()]);
+                            [$messageId, $matches[2], now()->toDateString()]);
 
-                    $client->post($this->appScriptForwardURL, [ RequestOptions::JSON => ["messageId" => $messageId, "To" => $this->redirectMail] ]);
+                    $this->logger->debug("$to адрес отправлен как $roistat_email");
+
+                    $client->post($this->appScriptForwardURL, [ RequestOptions::JSON => ["messageId" => $messageId, "To" => $roistat_email] ]);
                 } catch ( Throwable $exception) {
                     $this->logger->error( $exception->getMessage() );
                 }

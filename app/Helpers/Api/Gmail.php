@@ -9,6 +9,8 @@ use Google\Service\Exception as GoogleException;
 use Google\Service\Gmail\ListHistoryResponse;
 use Google\Service\Gmail\Message;
 use Google\Service\Gmail\MessagePartHeader;
+use Google\Service\Gmail\WatchRequest;
+use Google\Service\Gmail\WatchResponse;
 use Google_Client;
 use Google_Service_Gmail;
 use Google\Service\Gmail\MessagePart;
@@ -88,6 +90,32 @@ class Gmail
     public function historyList( array $params ): ListHistoryResponse
     {
         return $this->service->users_history->listUsersHistory('me', $params);
+    }
+
+    /**
+     * Запускает прослушивание всех входящих имейлов
+     * https://developers.google.com/gmail/api/reference/rest/v1/users/watch
+     *
+     * Функция должна вызываться как минимум каждую неделю -> https://developers.google.com/gmail/api/guides/push#renewing_mailbox_watch
+     */
+    public function startWatch( string $topicName ): WatchResponse
+    {
+        $watchRequest = new WatchRequest();
+        $watchRequest->setLabelIds(['INBOX']);
+        $watchRequest->setLabelFilterAction('include');
+
+        //https://console.cloud.google.com -> pub/sub -> Topics -> $topicName
+        $watchRequest->setTopicName( $topicName );
+
+        return $this->service->users->watch('me', $watchRequest);
+    }
+
+    /**
+     * Останавливает получение уведомлений о входящих имелах
+     */
+    public function stopWatch()
+    {
+        return $this->service->users->stop('me');
     }
 
     public function messageById( string $id, array $opt_params = [] ): Message|false
